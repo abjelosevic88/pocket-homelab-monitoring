@@ -43,7 +43,6 @@ export function TopBar({ title, sub, controls, onPalette, onMenu, mobile, compac
       <span className="spacer" />
       {controls}
       <button type="button" className="btn ghost icon-only" onClick={onPalette} aria-label="Search" title="Search (⌘K or /)"><Icon name="search" size={18} /></button>
-      {!mobile && <button type="button" className="btn ghost icon-only" onClick={() => navigate('/settings')} aria-label="Settings" title="Settings"><Icon name="settings" size={18} /></button>}
       <MenuButton label="Account" className="avatar-btn" align="right" width={220} items={avatarMenu}>
         <Avatar name={user?.name} email={user?.email} size={30} />
       </MenuButton>

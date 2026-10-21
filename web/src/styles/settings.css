@@ -108,3 +108,18 @@
 .steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--text-2); line-height: 1.5; }
 .steps li > .copy-field, .steps li > pre { margin-top: 6px; }
 .steps code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- opening animation ---------- */
+/* Settings slides up into place when it opens; the nav items follow one by one
+   and each section fades in when you switch to it. */
+@keyframes set-open { from { opacity: 0; transform: translateY(14px) scale(.992); } to { opacity: 1; transform: none; } }
+@keyframes set-item { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes set-swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.set-page { animation: set-open .34s var(--ease) both; transform-origin: 50% 0; }
+.set-nav-item { animation: set-item .3s var(--ease) both; }
+.set-nav-item:nth-child(1) { animation-delay: .06s; } .set-nav-item:nth-child(2) { animation-delay: .085s; }
+.set-nav-item:nth-child(3) { animation-delay: .11s; } .set-nav-item:nth-child(4) { animation-delay: .135s; }
+.set-nav-item:nth-child(5) { animation-delay: .16s; } .set-nav-item:nth-child(6) { animation-delay: .185s; }
+.set-nav-item:nth-child(7) { animation-delay: .21s; } .set-nav-item:nth-child(8) { animation-delay: .235s; }
+.set-nav-item:nth-child(9) { animation-delay: .26s; } .set-nav-item:nth-child(n+10) { animation-delay: .285s; }
+.set-inner { animation: set-swap .26s var(--ease) both; }
