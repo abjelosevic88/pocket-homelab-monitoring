@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -579,7 +578,7 @@ func (l *Local) readFS(ctx context.Context, s *Snapshot) error {
 		if !ok || st.Blocks == 0 {
 			continue
 		}
-		bs := uint64(st.Bsize)
+		bs := st.Bsize
 		total, free, avail := st.Blocks*bs, st.Bfree*bs, st.Bavail*bs
 		used := sub(total, free)
 		f := FS{Device: m.src, Mount: m.mount, Type: m.typ, Total: total, Used: used, Free: avail, ReadOnly: m.ro, NetworkFS: netFS[m.typ]}
@@ -593,29 +592,6 @@ func (l *Local) readFS(ctx context.Context, s *Snapshot) error {
 	}
 	sort.SliceStable(s.FS, func(i, j int) bool { return s.FS[i].Mount < s.FS[j].Mount })
 	return nil
-}
-
-// statfs gives up after two seconds so a hung NFS server cannot stall a reading.
-func statfs(ctx context.Context, path string, network bool) (syscall.Statfs_t, bool) {
-	var st syscall.Statfs_t
-	if !network {
-		return st, syscall.Statfs(path, &st) == nil
-	}
-	done := make(chan bool, 1)
-	go func() {
-		var x syscall.Statfs_t
-		ok := syscall.Statfs(path, &x) == nil
-		st = x
-		done <- ok
-	}()
-	select {
-	case ok := <-done:
-		return st, ok
-	case <-time.After(2 * time.Second):
-		return st, false
-	case <-ctx.Done():
-		return st, false
-	}
 }
 
 func unescapeMount(s string) string {
@@ -969,8 +945,8 @@ func (l *Local) readProcs(s *Snapshot, now time.Time) error {
 		}
 		pid := strconv.Itoa(int(p.PID))
 		if fi, err := os.Stat(l.proc(pid)); err == nil {
-			if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-				p.User = l.userName(st.Uid)
+			if uid, ok := fileUID(fi); ok {
+				p.User = l.userName(uid)
 			}
 		}
 		if cmd, err := os.ReadFile(l.proc(pid, "cmdline")); err == nil && len(cmd) > 0 {

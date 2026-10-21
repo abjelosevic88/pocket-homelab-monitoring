@@ -26,8 +26,8 @@ jobs:
           DATA_DIR=/tmp/pt DEMO_DATA=true AUTH_MODE=none ./pocket-monitoring &
           sleep 2
           curl -fsS http://localhost:8080/healthz
-          sleep 6
           curl -fsS http://localhost:8080/api/v1/servers | grep -q '"kind":"local"'
+          for i in $(seq 1 20); do curl -fsS http://localhost:8080/api/v1/servers/1/snapshot >/dev/null 2>&1 && break; sleep 1; done
           curl -fsS http://localhost:8080/api/v1/servers/1/snapshot | grep -q '"cpu"'
           curl -fsS "http://localhost:8080/api/v1/servers/1/history?range=24h" | grep -q '"points"'
           curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
