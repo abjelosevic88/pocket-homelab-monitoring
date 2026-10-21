@@ -21,6 +21,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="sb-brand">
         <img src="/favicon.svg" alt="" className="sb-logo" />
         <span className="sb-title">{status?.title && status.title !== 'Pocket Monitoring' ? status.title : <>Pocket <b>Monitoring</b></>}</span>
+        {status?.version && <span className="sb-version" title={`Version ${status.version}`}>{/^\d/.test(status.version) ? 'v' + status.version : status.version}</span>}
       </div>
       <button type="button" className="btn primary create-btn" onClick={() => { onNavigate?.(); openAddServer() }}><Icon name="plus" size={17} strokeWidth={2.2} />Add server<kbd className="kbd-on-primary">N</kbd></button>
 
