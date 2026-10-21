@@ -28,6 +28,7 @@ func (s *Server) serverRoutes(r chi.Router) {
 	r.Get("/servers/{id}/snapshot", s.handleSnapshot)
 	r.Get("/servers/{id}/live", s.handleLive)
 	r.Get("/servers/{id}/history", s.handleHistory)
+	r.Get("/servers/{id}/logs", s.handleLogs)
 	r.Get("/servers/{id}/shares", s.handleListShares)
 	r.Post("/servers/{id}/shares", s.handleCreateShare)
 	r.Delete("/shares/{sid}", s.handleDeleteShare)

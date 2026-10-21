@@ -15,15 +15,16 @@ import { AlertList } from './Alerts'
 import { type ChartData, HistoryCharts } from './server/HistoryCharts'
 import { CpuPanel, DiskPanel, FsPanel, MemPanel, NetPanel, NoData, QuickTiles, RaidPanel, SensorsPanel, SystemPanel } from './server/Panels'
 import { ContainerTable, ProcessTable } from './server/Tables'
+import { LogsView } from './server/Logs'
 
 export const RANGES: { value: RangeName; label: string; long: string }[] = [
   { value: 'live', label: 'Live', long: 'Live (last 15 minutes)' }, { value: '1h', label: '1h', long: 'Last hour' }, { value: '6h', label: '6h', long: 'Last 6 hours' },
   { value: '24h', label: '24h', long: 'Last 24 hours' }, { value: '7d', label: '7d', long: 'Last 7 days' }, { value: '30d', label: '30d', long: 'Last 30 days' },
 ]
-type Section = 'overview' | 'processes' | 'containers' | 'io' | 'system'
+type Section = 'overview' | 'processes' | 'containers' | 'logs' | 'io' | 'system'
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'activity' }, { id: 'processes', label: 'Processes', icon: 'list' },
-  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
+  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
 ]
 
 /** Polls `fn` every `ms` while the tab is visible; keeps the last good value. */
@@ -63,6 +64,8 @@ export default function ServerPage() {
   const setParam = (k: string, v: string, def: string) => setSearch(p => { const n = new URLSearchParams(p); if (v === def) n.delete(k); else n.set(k, v); return n }, { replace: true })
   const setRange = (r: RangeName) => setParam('range', r, settings?.default_range || 'live')
   const setSection = (s: Section) => setParam('tab', s, 'overview')
+  const logsFor = search.get('c') || ''
+  const openLogs = (name: string) => setSearch(p => { const n = new URLSearchParams(p); n.set('tab', 'logs'); if (name) n.set('c', name); else n.delete('c'); return n }, { replace: true })
 
   const interval = Math.max(3, Math.min(server?.interval_s || 5, 10)) * 1000
   const snap = usePoll(() => api.get<Snapshot>(`${V1}/servers/${sid}/snapshot`), server?.enabled === false ? 0 : interval, [sid, interval, server?.enabled])
@@ -135,7 +138,8 @@ export default function ServerPage() {
               <FsPanel snap={s} />
             </>}
             {section === 'processes' && <ProcessTable snap={s} />}
-            {section === 'containers' && <ContainerTable snap={s} />}
+            {section === 'containers' && <ContainerTable snap={s} onLogs={server.kind !== 'glances' && server.role === 'owner' ? openLogs : undefined} />}
+            {section === 'logs' && <LogsView server={server} snap={s} initial={logsFor} onPick={openLogs} />}
             {section === 'io' && <div className="stack"><NetPanel snap={s} /><DiskPanel snap={s} /><FsPanel snap={s} /></div>}
             {section === 'system' && <div className="panel-grid"><SystemPanel snap={s} server={server} /><RaidPanel snap={s} /><SensorsPanel snap={s} /></div>}
           </div>

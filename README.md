@@ -47,6 +47,9 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
 - **Processes:** the busiest and the biggest, with user, threads, state, disk I/O and the container they run in.
 - **Containers:** state and health, CPU, memory against the limit, network and block I/O, uptime, restarts,
   compose project and ports.
+- **Container logs:** any container's log, or every running container merged by time; follow new lines
+  live, filter, errors only, times, wrap, the last 200–5,000 lines, download. Logs are for the server's
+  owner only (they tend to hold secrets); agents serve them too, Glances doesn't.
 
 ## Alerts
 

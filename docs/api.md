@@ -39,6 +39,7 @@ Every server belongs to the person who added it. Others see it only when it is s
 | GET | `/servers/{id}/snapshot` | `Snapshot` latest full reading (404 `{"error":"no data yet"}` before the first) |
 | GET | `/servers/{id}/live` | `{step_s, points: Point[]}` last 15 minutes at the collection interval (from memory) |
 | GET | `/servers/{id}/history?range=1h\|6h\|24h\|7d\|30d\|90d` | `History` |
+| GET | `/servers/{id}/logs?container=&tail=&since=` | `Logs` container logs, owner only (403 for viewers, 501 for Glances). `container` = name or id, '' = every running container merged by time; `tail` 1–5000 (500); `since` = the `t` of the last line you have → only newer lines (follow by polling) |
 | GET | `/servers/{id}/shares` | `Share[]` (owner) |
 | POST | `/servers/{id}/shares` | `{user_id}` or `{everyone:true}` → `Share` |
 | DELETE | `/shares/{sid}` | owner |
@@ -76,4 +77,5 @@ Metrics and what `threshold` means:
 ## Agent (on the monitored machine)
 
 `GET /agent/v1/snapshot` with `Authorization: Bearer <AGENT_TOKEN>` → `Snapshot`.
+`GET /agent/v1/logs?container=&tail=&since=` (same token) → `Logs`.
 `GET /healthz` → `{status, version}`.

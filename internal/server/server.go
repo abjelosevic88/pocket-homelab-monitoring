@@ -201,6 +201,7 @@ func (s *Server) Router() http.Handler {
 	}
 
 	r.Get("/agent/v1/snapshot", s.handleAgentSnapshot)
+	r.Get("/agent/v1/logs", s.handleAgentLogs)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(middleware.Timeout(180 * time.Second))

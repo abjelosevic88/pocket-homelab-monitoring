@@ -98,7 +98,7 @@ func TestServersArePerPerson(t *testing.T) {
 		t.Fatalf("the admin sees someone else's server: %v", list)
 	}
 	id := itoa64(sv.ID)
-	for _, p := range []string{"/servers/" + id, "/servers/" + id + "/snapshot", "/servers/" + id + "/live", "/servers/" + id + "/history", "/servers/" + id + "/shares"} {
+	for _, p := range []string{"/servers/" + id + "/logs", "/servers/" + id, "/servers/" + id + "/snapshot", "/servers/" + id + "/live", "/servers/" + id + "/history", "/servers/" + id + "/shares"} {
 		if c := h.do(admin, "GET", p, nil, nil); c != http.StatusNotFound {
 			t.Errorf("GET %s as another person: %d, want 404", p, c)
 		}
@@ -138,6 +138,9 @@ func TestServersArePerPerson(t *testing.T) {
 	}
 	if c := h.do(admin, "GET", "/servers/"+id+"/history?range=24h", nil, nil); c != http.StatusOK {
 		t.Errorf("viewer history: %d", c)
+	}
+	if c := h.do(admin, "GET", "/servers/"+id+"/logs", nil, nil); c != http.StatusForbidden {
+		t.Errorf("viewer logs: %d, want 403", c)
 	}
 	if c := h.do(admin, "PUT", "/servers/"+id, map[string]any{"name": "x"}, nil); c != http.StatusForbidden {
 		t.Errorf("viewer PUT: %d, want 403", c)

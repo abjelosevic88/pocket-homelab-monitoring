@@ -10,7 +10,7 @@ import { SortTh, useSort } from './sort'
 
 const STATE_LABEL: Record<string, string> = { R: 'running', S: 'sleeping', D: 'disk wait', Z: 'zombie', T: 'stopped', I: 'idle', t: 'traced', X: 'dead' }
 
-function Search({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+export function Search({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <div className="tbl-search">
       <Icon name="search" size={14} />
@@ -75,7 +75,7 @@ export function ProcessTable({ snap }: { snap: Snapshot }) {
 
 type CFilter = 'all' | 'running' | 'stopped' | 'unhealthy'
 
-function ContainerState({ c }: { c: Container }) {
+export function ContainerState({ c }: { c: Container }) {
   if (c.health === 'unhealthy') return <LevelBadge lvl="crit">unhealthy</LevelBadge>
   if (c.state === 'running') return <span className="lvl-badge ok"><Icon name={c.health === 'healthy' ? 'check-circle' : 'play'} size={11} />{c.health === 'starting' ? 'starting' : c.health === 'healthy' ? 'healthy' : 'running'}</span>
   if (c.state === 'restarting') return <LevelBadge lvl="warn">restarting</LevelBadge>
@@ -83,7 +83,7 @@ function ContainerState({ c }: { c: Container }) {
   return <span className="lvl-badge off"><Icon name="power" size={11} />{c.state || 'stopped'}</span>
 }
 
-export function ContainerTable({ snap }: { snap: Snapshot }) {
+export function ContainerTable({ snap, onLogs }: { snap: Snapshot; onLogs?: (name: string) => void }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<CFilter>('all')
   const all = snap.containers || []
@@ -121,6 +121,7 @@ export function ContainerTable({ snap }: { snap: Snapshot }) {
               <SortTh sort={sort} k="read_bps" label="Disk R / W" right className="hide-md" />
               <SortTh sort={sort} k="started" label="Up" right className="hide-sm" />
               <th className="hide-md">Image</th>
+              {onLogs && <th><span className="sr-only">Logs</span></th>}
             </tr></thead>
             <tbody>
               {sort.rows.map(c => (
@@ -134,6 +135,7 @@ export function ContainerTable({ snap }: { snap: Snapshot }) {
                   <td className="right tnum hide-md small">{c.state === 'running' ? `${fmtRate(c.read_bps)} / ${fmtRate(c.write_bps)}` : '–'}</td>
                   <td className="right tnum hide-sm muted">{c.state === 'running' && c.started ? fmtDuration(now - c.started) : '–'}</td>
                   <td className="hide-md mono small ellipsis-cell" title={c.image}>{c.image}</td>
+                  {onLogs && <td className="right"><button type="button" className="btn ghost icon-only xs" aria-label={`Logs of ${c.name}`} title="Logs" onClick={() => onLogs(c.name)}><Icon name="terminal" size={14} /></button></td>}
                 </tr>
               ))}
             </tbody>

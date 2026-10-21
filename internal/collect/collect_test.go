@@ -33,3 +33,31 @@ func TestGlancesUptime(t *testing.T) {
 		t.Fatalf("got %d", got)
 	}
 }
+
+func TestParseLogStream(t *testing.T) {
+	frame := func(kind byte, s string) []byte {
+		b := []byte{kind, 0, 0, 0, 0, 0, 0, byte(len(s))}
+		return append(b, s...)
+	}
+	var b []byte
+	b = append(b, frame(1, "2026-10-21T15:00:00.000000001Z hello\n2026-10-21T15:00:00.0000")...)
+	b = append(b, frame(1, "00002Z split line\n")...)
+	b = append(b, frame(2, "2026-10-21T15:00:01.000000000Z oops\n")...)
+	got := parseLogStream(b, "web")
+	if len(got) != 3 || got[1].Msg != "split line" || got[2].Stream != "err" || got[0].T != "2026-10-21T15:00:00.000000001Z" || got[2].Container != "web" {
+		t.Fatalf("got %+v", got)
+	}
+	raw := parseLogStream([]byte("2026-10-21T15:00:00Z tty line\r\n"), "tty")
+	if len(raw) != 1 || raw[0].Msg != "tty line" {
+		t.Fatalf("raw: %+v", raw)
+	}
+}
+
+func TestLogQueryRejectsPaths(t *testing.T) {
+	for _, c := range []string{"../etc", "a/b", "x?y=1"} {
+		q := LogQuery{Container: c}
+		if q.Clamp() == nil {
+			t.Errorf("%q accepted", c)
+		}
+	}
+}

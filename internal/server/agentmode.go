@@ -76,6 +76,14 @@ func RunAgent(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		}
 		writeJSON(w, http.StatusOK, snap)
 	})
+	mux.HandleFunc("GET /agent/v1/logs", func(w http.ResponseWriter, r *http.Request) {
+		if !AgentAuthorized(r, cfg.AgentToken) {
+			time.Sleep(300 * time.Millisecond)
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		serveAgentLogs(w, r, l.Docker)
+	})
 	addr := cfg.Host + ":" + itoa64(int64(cfg.AgentPort))
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {

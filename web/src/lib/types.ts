@@ -161,6 +161,12 @@ export interface Snapshot {
   errors?: string[]
 }
 
+// ---- container logs ----
+
+/** One log line: t = RFC3339Nano from the engine, c = container name, s = out | err. */
+export interface LogLine { t: string; c: string; s: 'out' | 'err'; m: string }
+export interface Logs { lines: LogLine[]; truncated: boolean; now: string }
+
 // ---- history ----
 
 /** One point of history. t = unix seconds. Rates are bytes per second, temps °C. */
