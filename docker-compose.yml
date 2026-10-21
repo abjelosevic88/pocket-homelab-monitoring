@@ -1,0 +1,22 @@
+services:
+  pocket-monitoring:
+    image: ghcr.io/abjelosevic88/pocket-homelab-monitoring:latest
+    container_name: pocket-monitoring
+    restart: unless-stopped
+    pid: host                 # every process on the box
+    network_mode: host        # the real network interfaces; the app listens on PORT directly
+    # group_add: ["988"]      # the docker group's id (getent group docker) for the Containers panel
+    environment:
+      PORT: "8080"
+      TZ: ${TZ:-UTC}
+      BASE_URL: ${BASE_URL:-}
+      # ADMIN_EMAIL: ${ADMIN_EMAIL}
+      # ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # SECURE_COOKIES: "true"
+      # NOTIFY_URL: http://localhost:8000/notify/alerts   # Apprise route for alerts
+      # CORE_URL: http://localhost:8179                   # Pocket Core
+      # CORE_REGISTRATION_KEY: …
+    volumes:
+      - ./data:/data
+      - /:/host/root:ro,rslave
+      - /var/run/docker.sock:/var/run/docker.sock:ro
