@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/** Ask in the header on phones; on a desktop the floating Pocket Ask launcher
- *  sits in the bottom-right corner instead. While this button is on the page
+/** Ask in the header at every screen size. While this button is on the page,
  *  the launcher hides its own floating pill ([data-pocket-ask-trigger]). */
 export function AskButton() {
   const [available, setAvailable] = useState(() => !!document.querySelector('pocket-ask-launcher'))
