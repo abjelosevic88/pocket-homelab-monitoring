@@ -4,6 +4,7 @@ import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { Icon } from './icons'
 import { Avatar, MenuButton } from './ui'
+import { AskButton } from './AskButton'
 
 export function TopBar({ title, sub, controls, onPalette, onMenu, mobile, compact, loading, sidebarOpen }: {
   title: React.ReactNode
@@ -43,6 +44,7 @@ export function TopBar({ title, sub, controls, onPalette, onMenu, mobile, compac
       <span className="spacer" />
       {controls}
       <button type="button" className="btn ghost icon-only" onClick={onPalette} aria-label="Search" title="Search (⌘K or /)"><Icon name="search" size={18} /></button>
+      {mobile && <AskButton />}
       <MenuButton label="Account" className="avatar-btn" align="right" width={220} items={avatarMenu}>
         <Avatar name={user?.name} email={user?.email} size={30} />
       </MenuButton>
