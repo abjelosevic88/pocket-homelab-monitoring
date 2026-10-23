@@ -1,6 +1,13 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Monitoring</h1>
 <p align="center">Watch your server and every other machine you own: CPU, memory, swap, load, network, disks, file systems, temperatures, processes and containers — live, as history, and with alerts on your phone when something runs hot, fills up, crashes or goes offline.<br>One Go binary, one SQLite file, one volume.</p>
+<p align="center">
+  <a href="https://github.com/abjelosevic88/pocket-homelab-monitoring/actions"><img src="https://github.com/abjelosevic88/pocket-homelab-monitoring/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/abjelosevic88/pocket-homelab-monitoring/pkgs/container/pocket-homelab-monitoring"><img src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-blue" alt="image"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
+</p>
+
+---
 
 Pocket Monitoring is Glances with a memory and a household. It reads the box it runs on straight from
 `/proc`, `/sys` and the Docker socket, keeps a minute-by-minute history for a week and quarter-hour
