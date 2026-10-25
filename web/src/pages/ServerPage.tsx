@@ -16,15 +16,16 @@ import { type ChartData, HistoryCharts } from './server/HistoryCharts'
 import { CpuPanel, DiskPanel, FsPanel, MemPanel, NetPanel, NoData, QuickTiles, RaidPanel, SensorsPanel, SystemPanel } from './server/Panels'
 import { ContainerTable, ProcessTable } from './server/Tables'
 import { LogsView } from './server/Logs'
+import { JobsView } from './server/Jobs'
 
 export const RANGES: { value: RangeName; label: string; long: string }[] = [
   { value: 'live', label: 'Live', long: 'Live (last 15 minutes)' }, { value: '1h', label: '1h', long: 'Last hour' }, { value: '6h', label: '6h', long: 'Last 6 hours' },
   { value: '24h', label: '24h', long: 'Last 24 hours' }, { value: '7d', label: '7d', long: 'Last 7 days' }, { value: '30d', label: '30d', long: 'Last 30 days' },
 ]
-type Section = 'overview' | 'processes' | 'containers' | 'logs' | 'io' | 'system'
+type Section = 'overview' | 'processes' | 'containers' | 'jobs' | 'logs' | 'io' | 'system'
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'activity' }, { id: 'processes', label: 'Processes', icon: 'list' },
-  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
+  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
 ]
 
 /** Polls `fn` every `ms` while the tab is visible; keeps the last good value. */
@@ -139,6 +140,7 @@ export default function ServerPage() {
             </>}
             {section === 'processes' && <ProcessTable snap={s} />}
             {section === 'containers' && <ContainerTable snap={s} onLogs={server.kind !== 'glances' && server.role === 'owner' ? openLogs : undefined} />}
+            {section === 'jobs' && <JobsView server={server} />}
             {section === 'logs' && <LogsView server={server} snap={s} initial={logsFor} onPick={openLogs} />}
             {section === 'io' && <div className="stack"><NetPanel snap={s} /><DiskPanel snap={s} /><FsPanel snap={s} /></div>}
             {section === 'system' && <div className="panel-grid"><SystemPanel snap={s} server={server} /><RaidPanel snap={s} /><SensorsPanel snap={s} /></div>}

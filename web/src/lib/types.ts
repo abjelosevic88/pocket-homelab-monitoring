@@ -199,7 +199,70 @@ export interface History {
 
 // ---- alerts ----
 
-export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid'
+export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job'
+
+// ---- scheduled jobs ----
+
+export type JobStatus = 'ok' | 'running' | 'paused' | 'failed' | 'stuck' | 'overdue' | 'unscheduled'
+
+export interface JobRun {
+  unit: string
+  invocation: string
+  /** unix ms; 0 when unknown */
+  start: number
+  end: number
+  ok: boolean
+  result: string
+  exit_status: number
+  summary: string
+  lines: number
+  warnings: number
+}
+
+export interface Job {
+  unit: string
+  service: string
+  scope: 'user' | 'system'
+  description: string
+  schedule: string[] | null
+  enabled: boolean
+  file_state: string
+  scheduled: boolean
+  next: number
+  last_trigger: number
+  state: string
+  result: string
+  exit_status: number
+  last_start: number
+  last_end: number
+  control: boolean
+  name: string
+  label: string
+  group: string
+  notes: string
+  muted: boolean
+  status: JobStatus
+  problem: string
+  week: { runs: number; failed: number; busy: number; avg_ms: number; max_ms: number }
+  last_run: JobRun | null
+  last_kept: JobRun | null
+}
+
+export interface JobsList {
+  available: boolean
+  reason: string
+  error: string
+  checked_at: string
+  owner: boolean
+  host?: string
+  now?: number
+  jobs: Job[]
+  groups: string[]
+}
+
+export interface JobDay { day: string; runs: number; failed: number; busy: number }
+
+export interface JobLogLine { t: number; p: number; m: string; i: string; sys?: boolean }
 
 export interface Rule {
   id: number

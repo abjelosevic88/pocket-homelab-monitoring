@@ -19,7 +19,14 @@ Everything is an environment variable; nothing is required.
 | `DOCKER_INTERVAL` | `15s` | how often container stats are read |
 | `HOST_PROC` / `HOST_SYS` / `HOST_ROOT` | `/proc` / `/sys` / `/host/root` if mounted | where the host is visible |
 | `AGENT_TOKEN` | – | agent mode: required; web app: lets another hub read this box at `/agent/v1/snapshot` |
-| `AGENT_PORT` | `8193` | agent mode only |
+| `AGENT_PORT` | `8193` | agent and jobs-helper mode |
+| `JOBS_URL` / `JOBS_TOKEN` | – | web app: where this box's scheduled jobs come from (`pocket-monitoring jobs-agent` on the host) |
+| `JOBS_INTERVAL` | `1m` | how often every server's jobs are read |
+| `JOBS_STUCK_AFTER` | `6h` | a run longer than this alerts as stuck |
+| `JOBS_KEEP_DAYS` | `30` | how long failed runs and runs that wrote something are kept (quiet runs: a day; per-day counts: a year) |
+| `JOBS_SCOPE` | `auto` | agent / helper: `user`, `system`, `both`, `off`; `auto` = system when root, else user + system |
+| `JOBS_ALL_SYSTEM` | `false` | also list the distribution's timers (apt, logrotate…), not only `/etc` and `/usr/local` ones |
+| `JOBS_EXCLUDE` | – | comma-separated timer names or globs to hide (`apt-*,fstrim`) |
 | `NOTIFY_URL` / `NOTIFY_KIND` | – / `apprise` | the owner's alert route until they set their own (`apprise`, `ntfy`, `webhook`) |
 | `CORE_URL` / `CORE_REGISTRATION_KEY` / `CORE_APP_URL` | – | Pocket Core |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_NAME` | – | sign in with any OpenID Connect provider |

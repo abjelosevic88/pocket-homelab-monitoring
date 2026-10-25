@@ -57,6 +57,12 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
 - **Container logs:** any container's log, or every running container merged by time; follow new lines
   live, filter, errors only, times, wrap, the last 200–5,000 lines, download. Logs are for the server's
   owner only (they tend to hold secrets); agents serve them too, Glances doesn't.
+- **Scheduled jobs:** every systemd timer (your own `--user` ones and the ones an admin put in `/etc`)
+  with its schedule in words, last run, how long it took, the last line it wrote, the next run and the
+  week's runs and failures, grouped (Music, Backups, System… guessed from the name, yours to change).
+  Run one now, pause or resume its schedule, read each run's log. The *Activity* view is the feed of runs
+  that did something or failed, across every job — what your watchdogs actually fixed. Failures and runs
+  that wrote output are kept 30 days; quiet runs only count, so a job running every 10 s costs nothing.
 
 ## Alerts
 
@@ -66,6 +72,8 @@ array. Change the limits, add rules for one mount, sensor or container, or switc
 fires when its condition has held for the rule's duration, clears with a little hysteresis so it
 doesn't flap, and both ends are sent through **Apprise**, **ntfy** or a **webhook** to the owner and to
 everyone the server is shared with. A container that you stop on purpose (exit 0, 137, 143) is not a crash.
+The *scheduled jobs* rule fires when a job fails, has been running for over 6 hours, missed its run, or
+was left enabled without a running timer; mute one job from its menu.
 
 ## More machines
 
@@ -79,8 +87,21 @@ docker run -d --name pocket-monitoring-agent --restart unless-stopped \
   ghcr.io/abjelosevic88/pocket-homelab-monitoring:latest agent
 ```
 
-or the binary itself: `AGENT_TOKEN=… pocket-monitoring agent`. It serves one authenticated endpoint
-and keeps nothing on disk. A machine that already runs **Glances 4** (`glances -w`) can be added directly
+or the binary itself: `AGENT_TOKEN=… pocket-monitoring agent`. It serves a few authenticated endpoints
+and keeps nothing on disk but the list of jobs you paused. The binary agent also reports the machine's
+systemd timers (the container can't see systemd).
+
+**This box's scheduled jobs** when the app runs in a container: systemd isn't reachable from inside, so
+run the small jobs helper on the host, as the user whose timers you want, and point the app at it:
+
+```sh
+AGENT_TOKEN=$(openssl rand -hex 24) HOST=127.0.0.1 AGENT_PORT=8205 pocket-monitoring jobs-agent
+# in the app's environment (network_mode: host reaches 127.0.0.1):
+JOBS_URL=http://127.0.0.1:8205  JOBS_TOKEN=<the same token>
+```
+
+Pausing a job stops its timer and remembers it (the helper stops it again after a reboot); it never
+runs `systemctl disable`, which would delete a unit that is a symlink into the unit directory. A machine that already runs **Glances 4** (`glances -w`) can be added directly
 by its address — no agent needed.
 
 ## Run it

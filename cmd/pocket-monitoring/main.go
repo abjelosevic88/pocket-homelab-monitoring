@@ -35,7 +35,10 @@ func main() {
 			fmt.Println("pocket-monitoring", version)
 			return
 		case "agent":
-			runAgent()
+			runAgent(false)
+			return
+		case "jobs-agent":
+			runAgent(true)
 			return
 		case "backup":
 			runBackup(os.Args[2:])
@@ -48,7 +51,9 @@ func main() {
 
 Usage:
   pocket-monitoring                     start the server (default)
-  pocket-monitoring agent               serve this machine's readings to a hub (AGENT_TOKEN, AGENT_PORT)
+  pocket-monitoring agent               serve this machine's readings and scheduled jobs to a hub (AGENT_TOKEN, AGENT_PORT)
+  pocket-monitoring jobs-agent          serve only the scheduled jobs (systemd timers), for a hub in a
+                                       container on this machine (AGENT_TOKEN, AGENT_PORT; hub: JOBS_URL)
   pocket-monitoring backup [-o FILE]    write a consistent SQLite backup
   pocket-monitoring reset-password [-email USER] [-password NEW]
                                        set a user's password (default: first user, random password printed)
@@ -140,7 +145,7 @@ func serve() {
 	_ = httpSrv.Shutdown(shutdownCtx)
 }
 
-func runAgent() {
+func runAgent(jobsOnly bool) {
 	server.Version = version
 	cfg, err := config.Load()
 	if err != nil {
@@ -150,7 +155,7 @@ func runAgent() {
 	log := newLogger(cfg)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if err := server.RunAgent(ctx, cfg, log); err != nil {
+	if err := server.RunAgent(ctx, cfg, log, jobsOnly); err != nil {
 		log.Error("agent", "err", err)
 		os.Exit(1)
 	}

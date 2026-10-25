@@ -626,6 +626,8 @@ func metricName(m string) string {
 		return "Container"
 	case "raid":
 		return "RAID"
+	case "job":
+		return "Scheduled job"
 	}
 	return m
 }
@@ -673,6 +675,8 @@ func alertMessage(r store.Rule, c condition, sv store.Server, snap *collect.Snap
 		return "Container " + c.inst + " is not healthy"
 	case "raid":
 		return "RAID array " + c.inst + " is degraded"
+	case "job":
+		return c.label
 	case "disk":
 		return fmt.Sprintf("Disk %s is %s full (limit %s)", c.label, fmtValue("disk", c.value), fmtValue("disk", r.Threshold))
 	case "temp":
@@ -703,6 +707,7 @@ func defaultRules(serverID int64) []store.Rule {
 		{ServerID: serverID, Metric: "temp", Threshold: 90, ForS: 120, Severity: "critical", Enabled: true},
 		{ServerID: serverID, Metric: "container", ForS: 180, Severity: "warning", Enabled: true},
 		{ServerID: serverID, Metric: "raid", ForS: 0, Severity: "critical", Enabled: true},
+		{ServerID: serverID, Metric: "job", ForS: 0, Severity: "warning", Enabled: true},
 		{ServerID: serverID, Metric: "load", Threshold: 2, ForS: 900, Severity: "warning", Enabled: false},
 		{ServerID: serverID, Metric: "swap", Threshold: 90, ForS: 600, Severity: "warning", Enabled: false},
 	}

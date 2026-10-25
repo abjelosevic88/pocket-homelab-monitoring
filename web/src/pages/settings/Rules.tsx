@@ -21,6 +21,7 @@ export const METRICS: { value: Metric; label: string; help: string; unit: string
   { value: 'offline', label: 'Offline', help: 'No reading arrived from the server.', unit: '', def: 0, noThreshold: true },
   { value: 'container', label: 'Container', help: 'A container turned unhealthy, keeps restarting, or crashed (stopped with an error; a deliberate stop is fine).', unit: '', def: 0, target: 'container', noThreshold: true },
   { value: 'raid', label: 'RAID', help: 'A software RAID array is degraded.', unit: '', def: 0, noThreshold: true },
+  { value: 'job', label: 'Scheduled jobs', help: 'A scheduled job (systemd timer) failed, has been running too long, or stopped being scheduled. Mute one job from its menu on the Jobs tab.', unit: '', def: 0, noThreshold: true },
 ]
 const FOR: Option<number>[] = [0, 60, 120, 300, 600, 900, 1800, 3600].map(s => ({ value: s, label: s === 0 ? 'Right away' : `For ${fmtDuration(s).replace('m', ' min').replace('h', ' h')}` }))
 

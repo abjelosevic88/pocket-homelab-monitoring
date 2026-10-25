@@ -24,7 +24,7 @@ func (s *Server) alertRoutes(r chi.Router) {
 
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
 
-var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true}
+var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true, "job": true}
 
 func (s *Server) ownedServerIDs(ctx context.Context, uid int64) []int64 {
 	list, _ := s.store.VisibleServers(ctx, uid)
@@ -262,6 +262,12 @@ func (s *Server) alertResolved(ctx context.Context, sv store.Server, a *store.Al
 		body = fmt.Sprintf("Container %s is fine again%s.", a.Target, took)
 	case "raid":
 		body = fmt.Sprintf("RAID array %s is healthy again%s.", a.Target, took)
+	case "job":
+		if a.Target == "" {
+			body = fmt.Sprintf("Scheduled jobs on %s can be read again%s.", sv.Name, took)
+		} else {
+			body = fmt.Sprintf("Job %s is fine again%s.", strings.TrimSuffix(a.Target, ".timer"), took)
+		}
 	default:
 		what := metricName(a.Metric)
 		switch a.Metric {

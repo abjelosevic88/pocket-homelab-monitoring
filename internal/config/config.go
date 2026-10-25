@@ -65,6 +65,18 @@ type Config struct {
 	AgentToken string
 	AgentPort  int
 
+	// Scheduled jobs (systemd timers). The agent and the jobs helper read
+	// them (JOBS_SCOPE, JOBS_ALL_SYSTEM, JOBS_EXCLUDE); a hub in a container
+	// reads this box's through the helper at JOBS_URL with JOBS_TOKEN.
+	JobsScope     string
+	JobsAllSystem bool
+	JobsExclude   []string
+	JobsURL       string
+	JobsToken     string
+	JobsInterval  time.Duration // how often the hub reads every server's jobs
+	JobsStuck     time.Duration // a run longer than this is reported as stuck
+	JobsKeepDays  int           // kept runs (failures and runs that wrote something)
+
 	DemoData bool
 }
 
@@ -148,6 +160,15 @@ func Load() (*Config, error) {
 		AgentToken:     env("AGENT_TOKEN", ""),
 		AgentPort:      envInt("AGENT_PORT", 8193),
 
+		JobsScope:     strings.ToLower(env("JOBS_SCOPE", "auto")),
+		JobsAllSystem: envBool("JOBS_ALL_SYSTEM", false),
+		JobsExclude:   splitList(env("JOBS_EXCLUDE", "")),
+		JobsURL:       strings.TrimRight(env("JOBS_URL", ""), "/"),
+		JobsToken:     env("JOBS_TOKEN", ""),
+		JobsInterval:  envDuration("JOBS_INTERVAL", time.Minute),
+		JobsStuck:     envDuration("JOBS_STUCK_AFTER", 6*time.Hour),
+		JobsKeepDays:  envInt("JOBS_KEEP_DAYS", 30),
+
 		DemoData: envBool("DEMO_DATA", false),
 	}
 	if c.CoreAppURL == "" {
@@ -170,10 +191,29 @@ func Load() (*Config, error) {
 	if c.DockerInterval < 5*time.Second {
 		c.DockerInterval = 5 * time.Second
 	}
+	if c.JobsInterval < 15*time.Second {
+		c.JobsInterval = 15 * time.Second
+	}
+	if c.JobsStuck < 5*time.Minute {
+		c.JobsStuck = 5 * time.Minute
+	}
+	if c.JobsKeepDays < 1 {
+		c.JobsKeepDays = 1
+	}
 	if _, err := time.LoadLocation(c.Timezone); err != nil {
 		return nil, fmt.Errorf("TZ %q is not a known time zone", c.Timezone)
 	}
 	return c, nil
+}
+
+func splitList(v string) []string {
+	var out []string
+	for _, x := range strings.Split(v, ",") {
+		if x = strings.TrimSpace(x); x != "" {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // Addr returns host:port.

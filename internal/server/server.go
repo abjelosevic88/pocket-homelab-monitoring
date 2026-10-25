@@ -55,12 +55,13 @@ type Server struct {
 
 	mon    *monitor
 	alerts *alertEngine
+	jobs   *jobsHub
 }
 
 // New creates a server.
 func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Server {
 	ua := "PocketMonitoring/" + Version + " (+https://github.com/abjelosevic88/pocket-homelab-monitoring)"
-	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), alerts: newAlertEngine()}
+	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), alerts: newAlertEngine(), jobs: newJobsHub()}
 	s.http = &http.Client{Timeout: 60 * time.Second}
 	s.core = core.New(cfg.CoreURL, core.Options{DB: st.DB, TokenFile: cfg.DataDir + "/core.token", UserAgent: ua, ServiceCache: time.Minute, ServiceStale: 15 * time.Minute})
 	s.oidc = &oidcProvider{issuerURL: cfg.OIDCIssuer}
@@ -122,6 +123,7 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 		go s.mon.local.Docker.Run(ctx, s.cfg.DockerInterval)
 	}
 	go s.monitorLoop(ctx)
+	go s.jobsLoop(ctx)
 	go s.housekeeping(ctx)
 	if s.core.Configured() {
 		go s.coreLoop(ctx)
@@ -168,6 +170,7 @@ func (s *Server) housekeeping(ctx context.Context) {
 		if n%12 == 0 {
 			s.store.PruneSamples(ctx)
 			s.store.PruneAlerts(ctx, 180)
+			s.store.PruneJobRuns(ctx, s.cfg.JobsKeepDays)
 			_ = s.store.PurgeSessions(ctx)
 		}
 		n++
@@ -222,6 +225,7 @@ func (s *Server) Router() http.Handler {
 
 			s.serverRoutes(r)
 			s.alertRoutes(r)
+			s.jobRoutes(r)
 
 			r.Get("/users", s.handleListUsers)
 			r.Post("/users", s.handleCreateUser)

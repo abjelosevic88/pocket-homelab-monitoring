@@ -73,9 +73,24 @@ Metrics and what `threshold` means:
 | offline | – (fires when no reading for `for_s`) | – |
 | container | – (fires when a container is unhealthy, or was running and stopped) | container name or '' for any |
 | raid | – (fires when an array is degraded) | – |
+| job | – (fires when a scheduled job failed, is stuck, missed its run or isn't scheduled; mute per job) | the timer, or '' when the jobs can't be read |
+
+## Scheduled jobs
+
+| Method | Path | |
+|---|---|---|
+| GET | `/servers/{id}/jobs` | `{available, reason, error, checked_at, owner, host, jobs: Job[], groups}`; `Job` = the timer and service state, `schedule`, `next`, `status` (`ok`, `running`, `paused`, `failed`, `stuck`, `overdue`, `unscheduled`), `problem`, `week` stats, `last_run`, `last_kept`, and the person's `label`, `group`, `notes`, `muted` |
+| GET | `/servers/{id}/jobs/runs?unit=&failed=1&busy=1&before=&limit=` | kept runs newest first; without `unit` only runs that failed or wrote something |
+| GET | `/servers/{id}/jobs/days?unit=&days=30` | `[{day, runs, failed, busy}]` |
+| GET | `/servers/{id}/jobs/log?unit=&invocation=&tail=` | owner only: `{lines: [{t, p, m, i, sys}]}` from the journal |
+| POST | `/servers/{id}/jobs/action` | owner only: `{unit, action: run\|pause\|resume}` |
+| PUT | `/servers/{id}/jobs/settings` | owner only: `{unit, label?, group?, notes?, muted?}` |
 
 ## Agent (on the monitored machine)
 
 `GET /agent/v1/snapshot` with `Authorization: Bearer <AGENT_TOKEN>` → `Snapshot`.
 `GET /agent/v1/logs?container=&tail=&since=` (same token) → `Logs`.
+`GET /agent/v1/jobs?since=<unix ms>` → `{host, now, jobs, runs}` (runs that ended after `since`; default the last day).
+`GET /agent/v1/jobs/log?unit=&invocation=&tail=` → `{lines}`; `POST /agent/v1/jobs/action?unit=&action=run|pause|resume`.
+`pocket-monitoring jobs-agent` serves only these three.
 `GET /healthz` → `{status, version}`.
