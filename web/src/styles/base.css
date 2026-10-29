@@ -356,6 +356,7 @@ input.bare, textarea.bare { border-color: transparent; background: transparent; 
 .toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 6px 6px 14px; border-radius: 11px; background: #1f1f25; color: #f3f3f6; box-shadow: 0 10px 30px -8px rgba(0, 0, 0, .45); font-size: 13.5px; animation: toast-in .2s var(--ease); max-width: 520px; }
 [data-theme="dark"] .toast { background: #2c2c33; box-shadow: 0 10px 30px -8px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06); }
 .toast.err { background: #b42318; }
+.toasts .toast { color: #f3f3f6; } .toasts .toast.err { color: #fff; } /* beat app-wide .ok/.bad text colours */
 .toast-action { background: none; border: 0; color: #9dbbff; font-weight: 650; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
 .toast-action:hover { background: rgba(255, 255, 255, .08); }
 .toast.err .toast-action { color: #fff; text-decoration: underline; }
