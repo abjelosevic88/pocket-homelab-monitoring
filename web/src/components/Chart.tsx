@@ -60,7 +60,7 @@ function useWidth(ref: React.RefObject<HTMLElement | null>) {
 
 // ---------- line chart ----------
 
-export function LineChart({ xs, series, format, tickFormat, yMax, bytes, height = 170, loading, empty = 'No data for this range yet', h12 = false, step, label, area }: {
+export function LineChart({ xs, series, format, tickFormat, yMax, bytes, height = 170, loading, empty = 'No data for this range yet', h12 = false, step, label, area, guides = [] }: {
   xs: number[]
   series: Series[]
   /** Formats a value in the tooltip. */
@@ -78,6 +78,8 @@ export function LineChart({ xs, series, format, tickFormat, yMax, bytes, height 
   step?: number
   label: string
   area?: boolean
+  /** Dashed reference lines (a plan, a limit), labelled at the right edge. */
+  guides?: { value: number; label: string }[]
 }) {
   const box = useRef<HTMLDivElement>(null)
   const width = useWidth(box)
@@ -88,8 +90,9 @@ export function LineChart({ xs, series, format, tickFormat, yMax, bytes, height 
   const dataMax = useMemo(() => {
     let m = 0
     for (const s of series) for (const v of s.values) if (v !== null && v > m) m = v
+    for (const g of guides) if (g.value > m) m = g.value
     return m
-  }, [series])
+  }, [series, guides])
   const ticksY = useMemo(() => niceTicks(Math.max(yMax ?? 0, dataMax, yMax ? 0 : 1e-9) || 1, height < 140 ? 3 : 4, bytes), [yMax, dataMax, bytes, height])
   const top = ticksY[ticksY.length - 1] || 1
   // left gutter wide enough for the longest tick label
@@ -156,6 +159,12 @@ export function LineChart({ xs, series, format, tickFormat, yMax, bytes, height 
               <g key={t}>
                 <line x1={x0} x2={x1} y1={sy(t)} y2={sy(t)} className={t === 0 ? 'viz-base' : 'viz-grid'} />
                 <text x={x0 - 6} y={sy(t)} dy="0.32em" textAnchor="end" className="viz-tick">{tf(t)}</text>
+              </g>
+            ))}
+            {hasData && guides.filter(g => g.value > 0).map(g => (
+              <g key={g.label} className="viz-guide">
+                <line x1={x0} x2={x1} y1={sy(g.value)} y2={sy(g.value)} />
+                <text x={x1 - 4} y={sy(g.value) - 4} textAnchor="end">{g.label}</text>
               </g>
             ))}
             {hasData && ticksX.map(t => <text key={t} x={sx(t)} y={height - 5} textAnchor="middle" className="viz-tick">{fmtTick(t, xStep, h12)}</text>)}

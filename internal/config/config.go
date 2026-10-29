@@ -77,6 +77,10 @@ type Config struct {
 	JobsStuck     time.Duration // a run longer than this is reported as stuck
 	JobsKeepDays  int           // kept runs (failures and runs that wrote something)
 
+	// Internet speed tests: the Ookla Speedtest CLI on the machine the web
+	// app runs on (the image ships it). SPEEDTEST_BIN = its name or path.
+	SpeedtestBin string
+
 	DemoData bool
 }
 
@@ -168,6 +172,8 @@ func Load() (*Config, error) {
 		JobsInterval:  envDuration("JOBS_INTERVAL", time.Minute),
 		JobsStuck:     envDuration("JOBS_STUCK_AFTER", 6*time.Hour),
 		JobsKeepDays:  envInt("JOBS_KEEP_DAYS", 30),
+
+		SpeedtestBin: env("SPEEDTEST_BIN", "speedtest"),
 
 		DemoData: envBool("DEMO_DATA", false),
 	}

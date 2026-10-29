@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ import (
 	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/collect"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/config"
+	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/speedtest"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/store"
 )
 
@@ -56,12 +58,17 @@ type Server struct {
 	mon    *monitor
 	alerts *alertEngine
 	jobs   *jobsHub
+	speed  *speedHub
+
+	baseCtx context.Context // the app's lifetime (background work outlives requests)
 }
 
 // New creates a server.
 func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Server {
 	ua := "PocketMonitoring/" + Version + " (+https://github.com/abjelosevic88/pocket-homelab-monitoring)"
 	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), alerts: newAlertEngine(), jobs: newJobsHub()}
+	home, _ := filepath.Abs(cfg.DataDir)
+	s.speed = newSpeedHub(speedtest.Runner{Bin: cfg.SpeedtestBin, Home: home})
 	s.http = &http.Client{Timeout: 60 * time.Second}
 	s.core = core.New(cfg.CoreURL, core.Options{DB: st.DB, TokenFile: cfg.DataDir + "/core.token", UserAgent: ua, ServiceCache: time.Minute, ServiceStale: 15 * time.Minute})
 	s.oidc = &oidcProvider{issuerURL: cfg.OIDCIssuer}
@@ -81,6 +88,7 @@ func (s *Server) isOwner(ctx context.Context, uid int64) bool {
 
 // Bootstrap seeds the first admin (if configured), demo data and starts the workers.
 func (s *Server) Bootstrap(ctx context.Context) error {
+	s.baseCtx = ctx
 	if err := s.core.Start(ctx); err != nil {
 		return err
 	}
@@ -124,6 +132,7 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	}
 	go s.monitorLoop(ctx)
 	go s.jobsLoop(ctx)
+	go s.speedLoop(ctx)
 	go s.housekeeping(ctx)
 	if s.core.Configured() {
 		go s.coreLoop(ctx)
@@ -171,6 +180,7 @@ func (s *Server) housekeeping(ctx context.Context) {
 			s.store.PruneSamples(ctx)
 			s.store.PruneAlerts(ctx, 180)
 			s.store.PruneJobRuns(ctx, s.cfg.JobsKeepDays)
+			s.store.PruneSpeedTests(ctx)
 			_ = s.store.PurgeSessions(ctx)
 		}
 		n++
@@ -226,6 +236,7 @@ func (s *Server) Router() http.Handler {
 			s.serverRoutes(r)
 			s.alertRoutes(r)
 			s.jobRoutes(r)
+			s.speedRoutes(r)
 
 			r.Get("/users", s.handleListUsers)
 			r.Post("/users", s.handleCreateUser)
@@ -364,10 +375,10 @@ func (s *Server) coreLoop(ctx context.Context) {
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "monitoring", Name: "Pocket Monitoring",
-		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes and containers, live and as history, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
+		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes, containers and the internet connection's speed, live and as history, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "MONITORING",
-		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed"},
+		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest"},
 		Offers:    linkOffers,
 	}
 	if s.cfg.BaseURL != "" {
@@ -441,6 +452,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	for k, v := range counts {
 		fmt.Fprintf(w, "pocket_monitoring_rows{table=%q} %d\n", k, v)
 	}
+	s.speedMetrics(ctx, w)
 }
 
 // ---------- static / SPA ----------

@@ -9,7 +9,7 @@ import { Shell } from '../components/Shell'
 import { Empty, Loading, Segmented, useAsync } from '../components/ui'
 import { useState } from 'react'
 
-export const METRIC_ICON: Record<string, string> = { cpu: 'cpu', mem: 'memory', swap: 'memory', load: 'gauge', disk: 'disk', temp: 'thermometer', offline: 'power', container: 'box', raid: 'shield', job: 'clock' }
+export const METRIC_ICON: Record<string, string> = { cpu: 'cpu', mem: 'memory', swap: 'memory', load: 'gauge', disk: 'disk', temp: 'thermometer', offline: 'power', container: 'box', raid: 'shield', job: 'clock', speedtest: 'wifi', speed_down: 'download', speed_up: 'upload', speed_ping: 'zap' }
 
 export default function AlertsPage() {
   const { alerts, version } = useApp()

@@ -26,6 +26,7 @@ Everything is an environment variable; nothing is required.
 | `JOBS_KEEP_DAYS` | `30` | how long failed runs and runs that wrote something are kept (quiet runs: a day; per-day counts: a year) |
 | `JOBS_SCOPE` | `auto` | agent / helper: `user`, `system`, `both`, `off`; `auto` = system when root, else user + system |
 | `JOBS_ALL_SYSTEM` | `false` | also list the distribution's timers (apt, logrotate…), not only `/etc` and `/usr/local` ones |
+| `SPEEDTEST_BIN` | `speedtest` | web app: the [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) for the Internet tab (the image ships it; elsewhere install it and put it on PATH) |
 | `JOBS_EXCLUDE` | – | comma-separated timer names or globs to hide (`apt-*,fstrim`) |
 | `NOTIFY_URL` / `NOTIFY_KIND` | – / `apprise` | the owner's alert route until they set their own (`apprise`, `ntfy`, `webhook`) |
 | `CORE_URL` / `CORE_REGISTRATION_KEY` / `CORE_APP_URL` | – | Pocket Core |

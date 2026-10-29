@@ -36,6 +36,8 @@ server with someone and they see it read-only.
   </tr>
 </table>
 
+<p align="center"><img src="docs/screenshots/internet.png" width="900" alt="Internet speed tests: the newest result against the plan, speed and latency history, how often it met the minimums and when in the week it's slowest"></p>
+
 <p align="center"><img src="docs/screenshots/mobile.png" width="260" alt="A server on a phone"></p>
 
 Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent and an unreachable one.
@@ -63,6 +65,15 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
   Run one now, pause or resume its schedule, read each run's log. The *Activity* view is the feed of runs
   that did something or failed, across every job — what your watchdogs actually fixed. Failures and runs
   that wrote output are kept 30 days; quiet runs only count, so a job running every 10 s costs nothing.
+- **Internet:** speed tests of the connection the app sits on (Ookla's Speedtest CLI, which the image
+  ships): on a schedule (every 15 minutes to once a day, off the hour) or by hand, with a live view of
+  the test as it runs. Download, upload, ping, jitter, packet loss and **latency under load**
+  (bufferbloat, graded A+ to F) against what your plan promises; speed and latency history with the plan
+  and the slow line drawn in; typical / worst-10 % / worst per range and how often the minimums were met;
+  a weekday × time-of-day map of when it's slowest; every public IP the line had and when it changed.
+  A failed or slow scheduled test gets a second look 10 minutes later, a test can wait while the box is
+  busy moving data (and every test records how busy it was), notes per test, CSV export, and an import
+  of Speedtest Tracker's `database.sqlite` so the history comes along.
 
 ## Alerts
 
@@ -74,6 +85,9 @@ doesn't flap, and both ends are sent through **Apprise**, **ntfy** or a **webhoo
 everyone the server is shared with. A container that you stop on purpose (exit 0, 137, 143) is not a crash.
 The *scheduled jobs* rule fires when a job fails, has been running for over 6 hours, missed its run, or
 was left enabled without a running timer; mute one job from its menu.
+Speed test rules count *tests in a row* instead of minutes: *speed test failed* (the connection is down),
+*download* or *upload under* so many Mbps, *ping over* so many ms. Turning scheduled tests on adds them,
+starting from the minimums you set.
 
 ## More machines
 

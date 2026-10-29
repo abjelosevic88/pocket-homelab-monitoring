@@ -199,7 +199,86 @@ export interface History {
 
 // ---- alerts ----
 
-export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job'
+export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job' | 'speedtest' | 'speed_down' | 'speed_up' | 'speed_ping'
+
+// ---- internet speed tests ----
+
+/** One speed test. Speeds in Mbps, times in ms; null = not measured. */
+export interface SpeedTest {
+  id: number
+  server_id: number
+  /** unix seconds */
+  t: number
+  ok: boolean
+  error: string
+  trigger: 'schedule' | 'manual' | 'recheck' | 'import'
+  down_mbps: number | null
+  up_mbps: number | null
+  ping_ms: number | null
+  jitter_ms: number | null
+  loss_pct: number | null
+  /** latency while the line is busy downloading / uploading (bufferbloat) */
+  down_latency_ms: number | null
+  up_latency_ms: number | null
+  down_bytes: number
+  up_bytes: number
+  duration_ms: number
+  isp: string
+  external_ip: string
+  vpn: boolean
+  test_server_id: number
+  test_server: string
+  test_location: string
+  result_url: string
+  /** other traffic on the box right before the test */
+  busy_mbps: number | null
+  note: string
+}
+
+export interface SpeedSettings {
+  enabled: boolean
+  every_min: number
+  offset_min: number
+  test_server_id: number
+  test_server: string
+  plan_down: number
+  plan_up: number
+  min_down: number
+  min_up: number
+  max_ping: number
+  busy_mbps: number
+  keep_days: number
+}
+
+export interface SpeedLive {
+  server_id: number
+  trigger: string
+  started: string
+  phase: 'starting' | 'connecting' | 'ping' | 'download' | 'upload'
+  progress: number
+  mbps: number
+  ping_ms: number
+  down_mbps: number
+  server?: OoklaServer
+  isp?: string
+  curve: { ms: number; phase: 'download' | 'upload'; mbps: number }[]
+}
+
+export interface SpeedInfo {
+  available: boolean
+  reason: string
+  owner: boolean
+  settings: SpeedSettings
+  count: number
+  latest?: SpeedTest
+  live: SpeedLive | null
+  next_at?: string
+  recheck_at?: string
+  put_off?: boolean
+  busy_mbps: number
+}
+
+export interface OoklaServer { id: number; name: string; location: string; country: string; host: string }
 
 // ---- scheduled jobs ----
 

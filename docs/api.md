@@ -74,6 +74,32 @@ Metrics and what `threshold` means:
 | container | – (fires when a container is unhealthy, or was running and stopped) | container name or '' for any |
 | raid | – (fires when an array is degraded) | – |
 | job | – (fires when a scheduled job failed, is stuck, missed its run or isn't scheduled; mute per job) | the timer, or '' when the jobs can't be read |
+| speedtest | – (fires when the last `for_s` speed tests failed) | – |
+| speed_down / speed_up | Mbps (fires when the last `for_s` successful tests were all under it) | – |
+| speed_ping | ms (fires when the last `for_s` successful tests were all over it) | – |
+
+For the speed metrics `for_s` is a number of tests in a row (1–10), not seconds.
+
+## Internet speed tests
+
+Only the server of kind `local` (the machine the app runs on) runs tests. Speeds are Mbps, times ms,
+`t` unix seconds; a measurement that wasn't made is `null`.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/servers/{id}/speedtest` | `{available, reason, owner, settings, count, latest, live, next_at, recheck_at, put_off, busy_mbps}` |
+| GET | `/servers/{id}/speedtest/results?range=24h\|7d\|30d\|90d\|1y&from=&limit=` | `SpeedTest[]` oldest first: `ok`, `error`, `trigger` (`schedule`, `manual`, `recheck`, `import`), `down_mbps`, `up_mbps`, `ping_ms`, `jitter_ms`, `loss_pct`, `down_latency_ms`, `up_latency_ms`, bytes, `isp`, `external_ip`, `test_server`, `result_url`, `busy_mbps`, `note` |
+| GET | `/servers/{id}/speedtest/live` | `{live}`: the running test's `phase`, `progress`, `mbps`, `ping_ms`, `server`, `curve`, or `null` |
+| POST | `/servers/{id}/speedtest/run` | owner only: `{test_server_id?}` → 202; 409 while another test runs |
+| POST | `/servers/{id}/speedtest/cancel` | owner only |
+| PUT | `/servers/{id}/speedtest/settings` | owner only: `{enabled, every_min (15…1440), offset_min, test_server_id, test_server, plan_down, plan_up, min_down, min_up, max_ping, busy_mbps, keep_days}` |
+| GET | `/servers/{id}/speedtest/test-servers` | nearby Ookla servers `[{id, name, location, country, host}]` (cached an hour; `?fresh=1`) |
+| PUT / DELETE | `/servers/{id}/speedtest/results/{rid}` | owner only: `{note}` / remove a test |
+| GET | `/servers/{id}/speedtest/export.csv` | every test as CSV |
+| POST | `/servers/{id}/speedtest/import` | owner only: multipart `file` = Speedtest Tracker's `database.sqlite` → `{added, skipped, failed}` (safe to repeat) |
+
+Every finished test publishes the Core event `monitoring.speedtest`; `/metrics` has
+`pocket_monitoring_speedtest_{download_mbps,upload_mbps,ping_ms,jitter_ms,timestamp_seconds}`.
 
 ## Scheduled jobs
 
