@@ -301,7 +301,11 @@ export interface JobRun {
 export interface Job {
   unit: string
   service: string
-  scope: 'user' | 'system'
+  scope: 'user' | 'system' | 'app'
+  /** a Pocket app's own job (docs/jobs.md) */
+  app?: string
+  app_name?: string
+  url?: string
   description: string
   schedule: string[] | null
   enabled: boolean

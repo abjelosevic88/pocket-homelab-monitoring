@@ -148,7 +148,13 @@ func (s *Server) pollJobs(ctx context.Context, sv store.Server) {
 	st.mu.Unlock()
 	defer func() { st.mu.Lock(); st.inflight = false; st.mu.Unlock() }()
 
-	if why != "" {
+	var appJobs []jobs.Job
+	var appRuns []jobs.Run
+	var appErrs []string
+	if sv.Kind == "local" {
+		appJobs, appRuns, appErrs = s.appJobs(ctx, sv)
+	}
+	if why != "" && len(appJobs) == 0 {
 		st.mu.Lock()
 		st.status, st.err, st.available, st.checked = nil, "", false, time.Now()
 		st.mu.Unlock()
@@ -162,10 +168,23 @@ func (s *Server) pollJobs(ctx context.Context, sv store.Server) {
 	if since > 0 {
 		since -= 2 * 60 * 1000 // overlap: a run already stored is skipped by its id
 	}
-	rctx, cancel := context.WithTimeout(ctx, 40*time.Second)
-	status, err := src.Status(rctx, since)
-	cancel()
+	var status *jobs.Status
+	var err error
+	if why == "" {
+		rctx, cancel := context.WithTimeout(ctx, 40*time.Second)
+		status, err = src.Status(rctx, since)
+		cancel()
+	} else {
+		status = &jobs.Status{Now: time.Now().UnixMilli()} // no helper: the apps' jobs alone
+	}
 	now := time.Now()
+	if err == nil {
+		status.Jobs = append(status.Jobs, appJobs...)
+		status.Runs = append(status.Runs, appRuns...)
+		if len(appErrs) > 0 {
+			s.log.Debug("read app jobs", "server", sv.Name, "err", strings.Join(appErrs, "; "))
+		}
+	}
 	if err != nil {
 		st.mu.Lock()
 		noJobs := errors.Is(err, jobs.ErrNoJobs)
@@ -225,6 +244,9 @@ func jobName(j jobs.Job, set store.JobSettings) string {
 	if set.Label != "" {
 		return set.Label
 	}
+	if j.Name != "" {
+		return j.Name
+	}
 	return strings.TrimSuffix(j.Unit, ".timer")
 }
 
@@ -247,6 +269,13 @@ func jobStatus(j jobs.Job, set store.JobSettings, now time.Time, stuck time.Dura
 	}
 	if j.Paused || (!j.Enabled && !j.Scheduled) {
 		return "paused", ""
+	}
+	if j.Scope == "app" && (j.State == "failed" || j.Result == "failed") {
+		why := fmt.Sprintf("%s (%s) failed", name, j.AppName)
+		if lastFail != nil && lastFail.Summary != "" {
+			why += ": " + lastFail.Summary
+		}
+		return "failed", why
 	}
 	if j.State == "failed" || (j.Result != "" && j.Result != "success") {
 		why := fmt.Sprintf("%s failed (%s", name, resultText(j.Result))
@@ -429,7 +458,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 		code, why := jobStatus(j, set, now, s.cfg.JobsStuck, lf)
 		v := jobView{Job: j, Name: jobName(j, set), Label: set.Label, Group: set.Group, Notes: set.Notes, Muted: set.Muted, Status: code, Problem: why, Week: week[j.Unit]}
 		if v.Group == "" {
-			v.Group = guessGroup(j.Unit)
+			v.Group = firstNonEmpty(j.AppName, guessGroup(j.Unit))
 		}
 		groups[v.Group] = true
 		if x, ok := last[j.Unit]; ok {
@@ -530,12 +559,16 @@ func (s *Server) handleJobLog(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	q := r.URL.Query()
+	if _, _, isApp := parseAppUnit(q.Get("unit")); isApp {
+		writeErr(w, http.StatusNotImplemented, "a Pocket app's job has no journal here; each run's summary is in its history, details in the app")
+		return
+	}
 	src, why := s.jobSource(*sv)
 	if why != "" {
 		writeErr(w, http.StatusNotImplemented, why)
 		return
 	}
-	q := r.URL.Query()
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
 	lines, err := src.Log(ctx, q.Get("unit"), q.Get("invocation"), queryInt(r, "tail"))
@@ -563,17 +596,26 @@ func (s *Server) handleJobAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "the action is run, pause or resume")
 		return
 	}
-	src, why := s.jobSource(*sv)
-	if why != "" {
-		writeErr(w, http.StatusNotImplemented, why)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	j, err := src.Act(ctx, in.Unit, in.Action)
-	if err != nil {
-		writeErr(w, http.StatusBadGateway, err.Error())
-		return
+	var j *jobs.Job
+	if _, _, isApp := parseAppUnit(in.Unit); isApp {
+		if err := s.appJobAction(ctx, *sv, in.Unit, in.Action); err != nil {
+			writeErr(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		j = &jobs.Job{Unit: in.Unit}
+	} else {
+		src, why := s.jobSource(*sv)
+		if why != "" {
+			writeErr(w, http.StatusNotImplemented, why)
+			return
+		}
+		var err error
+		if j, err = src.Act(ctx, in.Unit, in.Action); err != nil {
+			writeErr(w, http.StatusBadGateway, err.Error())
+			return
+		}
 	}
 	s.log.Info("job action", "server", sv.Name, "unit", in.Unit, "action", in.Action, "by", me(r))
 	s.pollJobs(ctx, *sv) // the list shows the new state right away

@@ -65,6 +65,10 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
   Run one now, pause or resume its schedule, read each run's log. The *Activity* view is the feed of runs
   that did something or failed, across every job — what your watchdogs actually fixed. Failures and runs
   that wrote output are kept 30 days; quiet runs only count, so a job running every 10 s costs nothing.
+- **Pocket apps' own jobs** on the same tab: the jobs Pocket apps run themselves (Pocket Money's day review,
+  product check and reminders, Pocket Backups' backups, checks and prunes) with their runs, failures and
+  missed runs, and Run now — read through a Pocket Core app link as the server's owner, nothing to paste.
+  Apps join by implementing the small [jobs contract](docs/jobs.md); switching a job off stays in the app.
 - **Internet:** speed tests of the connection the app sits on (Ookla's Speedtest CLI, which the image
   ships): on a schedule (every 15 minutes to once a day, off the hour) or by hand, with a live view of
   the test as it runs. Download, upload, ping, jitter, packet loss and **latency under load**

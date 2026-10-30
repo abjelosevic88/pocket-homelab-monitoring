@@ -41,6 +41,12 @@ type Job struct {
 	LastEnd     int64    `json:"last_end"`   // unix ms
 	Control     bool     `json:"control"`    // this reader can run and pause it
 	Paused      bool     `json:"paused"`     // paused here: the timer is kept stopped
+
+	// a Pocket app's own job (docs/jobs.md): unit "app:<slug>:<id>", scope "app"
+	Name    string `json:"name,omitempty"`
+	App     string `json:"app,omitempty"`
+	AppName string `json:"app_name,omitempty"`
+	URL     string `json:"url,omitempty"` // its settings in the app
 }
 
 // Run is one finished run of a job's service.

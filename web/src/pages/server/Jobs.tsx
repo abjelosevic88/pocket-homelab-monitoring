@@ -232,7 +232,10 @@ function DaysChart({ days }: { days: JobDay[] }) {
 function jobMenu(j: Job, owner: boolean, onOpen: () => void, onAct: (a: 'run' | 'pause' | 'resume') => void, onMute: (m: boolean) => void): MenuItem[] {
   const items: MenuItem[] = [{ label: 'Details & runs', icon: 'list', onSelect: onOpen }]
   if (!owner) return items
-  if (j.control) {
+  if (j.app) {
+    if (j.control) items.push({ label: 'Run now', icon: 'play', onSelect: () => onAct('run'), disabled: j.status === 'running' })
+    if (j.url) items.push({ label: `Settings in ${j.app_name}`, icon: 'external', onSelect: () => window.open(j.url, '_blank', 'noopener') })
+  } else if (j.control) {
     items.push({ label: 'Run now', icon: 'play', onSelect: () => onAct('run'), disabled: j.status === 'running' })
     items.push(j.status === 'paused' ? { label: 'Resume schedule', icon: 'repeat', onSelect: () => onAct('resume') } : { label: 'Pause schedule', icon: 'pause', onSelect: () => onAct('pause') })
   } else {
@@ -258,6 +261,7 @@ function JobRow({ j, owner, mobile, onOpen, onAct, onMute }: { j: Job; owner: bo
           {j.status !== 'ok' && <StatusBadge s={j.status} sm />}
           {j.muted && <span title="No alerts for this job"><Icon name="bell-off" size={12} className="faint" /></span>}
           {j.scope === 'system' && <span className="tag">system</span>}
+          {j.app && <span className="tag" title={`Runs inside ${j.app_name}`}>app</span>}
         </div>
         <div className="muted xsmall ellipsis job-desc" title={j.problem || j.description}>{j.problem || j.description}</div>
         {mobile && <div className="faint xsmall">{scheduleText(j.schedule)}</div>}
@@ -330,10 +334,15 @@ type DetailTab = 'runs' | 'log' | 'settings'
 function JobDetail({ server, job, owner, groups, onClose, onAct, onSave }: { server: Server; job: Job; owner: boolean; groups: string[]; onClose: () => void; onAct: (a: 'run' | 'pause' | 'resume') => void; onSave: (p: Partial<Pick<Job, 'label' | 'group' | 'notes' | 'muted'>>) => Promise<boolean> }) {
   const [tab, setTab] = useState<DetailTab>('runs')
   const tabs: { id: DetailTab; label: string; icon: string }[] = [{ id: 'runs', label: 'Runs', icon: 'list' }]
-  if (owner) tabs.push({ id: 'log', label: 'Log', icon: 'terminal' }, { id: 'settings', label: 'Settings', icon: 'settings' })
+  if (owner && !job.app) tabs.push({ id: 'log', label: 'Log', icon: 'terminal' })
+  if (owner) tabs.push({ id: 'settings', label: 'Settings', icon: 'settings' })
   return (
     <Modal size="lg" onClose={onClose} title={<span className="row">{job.name}<StatusBadge s={job.status} /></span>}
-      footer={owner && job.control ? <>
+      footer={owner && job.app ? <>
+        {job.url && <a className="btn" href={job.url} target="_blank" rel="noopener"><Icon name="external" size={14} />Settings in {job.app_name}</a>}
+        <span className="spacer" />
+        {job.control && <button className="btn primary" disabled={job.status === 'running'} onClick={() => onAct('run')}><Icon name="play" size={14} />Run now</button>}
+      </> : owner && job.control ? <>
         {job.status === 'paused'
           ? <button className="btn" onClick={() => onAct('resume')}><Icon name="repeat" size={14} />Resume schedule</button>
           : <button className="btn" onClick={() => onAct('pause')}><Icon name="pause" size={14} />Pause schedule</button>}
@@ -347,7 +356,9 @@ function JobDetail({ server, job, owner, groups, onClose, onAct, onSave }: { ser
           <div><dt>Schedule</dt><dd>{scheduleText(job.schedule)}<div className="faint xsmall mono">{(job.schedule || []).join(' · ')}</div></dd></div>
           <div><dt>Next run</dt><dd>{job.status === 'paused' ? 'paused' : job.next ? `${until(job.next)} · ${fmtDateTime(job.next / 1000)}` : '—'}</dd></div>
           <div><dt>Last 7 days</dt><dd>{plural(job.week.runs, 'run')}, {job.week.failed} failed{job.week.avg_ms ? ` · usually ${durText(job.week.avg_ms)}, longest ${durText(job.week.max_ms)}` : ''}</dd></div>
-          <div><dt>Unit</dt><dd className="mono small">{job.unit} → {job.service} <span className="faint">({job.scope})</span></dd></div>
+          {job.app
+            ? <div><dt>Runs in</dt><dd>{job.app_name} <span className="faint mono small">({job.unit})</span>{job.status === 'paused' && <div className="faint xsmall">Switched off in {job.app_name}'s settings.</div>}</dd></div>
+            : <div><dt>Unit</dt><dd className="mono small">{job.unit} → {job.service} <span className="faint">({job.scope})</span></dd></div>}
           {job.notes && <div><dt>Notes</dt><dd className="pre-wrap">{job.notes}</dd></div>}
         </dl>
         {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={setTab} />}
@@ -371,7 +382,7 @@ function Runs({ server, job, owner }: { server: Server; job: Job; owner: boolean
         <ul className="job-runs">
           {runs.data.map(r => (
             <li key={r.invocation}>
-              <button type="button" className={`job-run ${r.ok ? '' : 'bad'}`} onClick={() => owner && setOpen(open === r.invocation ? null : r.invocation)} disabled={!owner} title={owner ? 'Show this run’s log' : undefined}>
+              <button type="button" className={`job-run ${r.ok ? '' : 'bad'}`} onClick={() => owner && !job.app && setOpen(open === r.invocation ? null : r.invocation)} disabled={!owner || !!job.app} title={owner && !job.app ? 'Show this run’s log' : undefined}>
                 <span className={`job-dot ${r.ok ? (r.warnings ? 'warn' : 'ok') : 'crit'}`} />
                 <span className="tnum small nowrap">{fmtDateTime(r.end / 1000)}</span>
                 <span className="faint xsmall nowrap">{r.start ? durText(r.end - r.start) : ''}</span>

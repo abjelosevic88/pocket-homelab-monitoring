@@ -22,6 +22,12 @@ type harness struct {
 func newHarness(t *testing.T) (*harness, *Server) {
 	t.Helper()
 	t.Setenv("LOCAL_COLLECTOR", "false")
+	// the shell may carry another Pocket app's settings (Pocket AI's CORE_*,
+	// BASE_URL, ADMIN_*, NOTIFY_*): a test must never register with the live
+	// Core, rotate its app token or send real notifications
+	for _, k := range []string{"CORE_URL", "CORE_REGISTRATION_KEY", "CORE_APP_URL", "BASE_URL", "ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_NAME", "NOTIFY_URL", "NOTIFY_KIND", "HOST"} {
+		t.Setenv(k, "")
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
