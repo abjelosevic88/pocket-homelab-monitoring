@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -87,7 +89,7 @@ func (s *Server) appCall(ctx context.Context, sv store.Server, slug, scope, meth
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(tok.URL, "/")+path, nil)
+	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(reachable(tok.URL), "/")+path, nil)
 	if err != nil {
 		return tok, err
 	}
@@ -113,6 +115,25 @@ func (s *Server) appCall(ctx context.Context, sv store.Server, slug, scope, meth
 		return tok, json.Unmarshal(raw, out)
 	}
 	return tok, nil
+}
+
+// reachable: Core hands out the address apps register with, often
+// host.docker.internal:<port>. Monitoring runs on the host's network, where
+// that name doesn't resolve but the same port is on 127.0.0.1.
+func reachable(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() != "host.docker.internal" {
+		return raw
+	}
+	if _, err := net.LookupHost(u.Hostname()); err == nil {
+		return raw
+	}
+	if p := u.Port(); p != "" {
+		u.Host = "127.0.0.1:" + p
+	} else {
+		u.Host = "127.0.0.1"
+	}
+	return u.String()
 }
 
 // skipApp: the app is not on this box, doesn't offer jobs yet, or the link is off.

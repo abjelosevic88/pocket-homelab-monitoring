@@ -86,7 +86,7 @@ func TestAppJobs(t *testing.T) {
 		Available bool `json:"available"`
 		Jobs      []struct {
 			Unit, Status, Problem, Group, Name, Scope, URL string
-			AppName                                         string `json:"app_name"`
+			AppName                                        string `json:"app_name"`
 		} `json:"jobs"`
 	}
 	id := itoa64(sv.ID)
@@ -127,5 +127,14 @@ func TestAppJobs(t *testing.T) {
 	}
 	if c := h.do(owner, "GET", "/servers/"+id+"/jobs/log?unit=app:money:day-review", nil, nil); c != http.StatusNotImplemented {
 		t.Fatalf("log of an app's job: %d", c)
+	}
+}
+
+func TestReachable(t *testing.T) {
+	if got := reachable("http://host.docker.internal:8178"); got != "http://127.0.0.1:8178" && got != "http://host.docker.internal:8178" {
+		t.Fatalf("reachable = %q", got)
+	}
+	if got := reachable("https://money.example/x"); got != "https://money.example/x" {
+		t.Fatalf("other hosts untouched: %q", got)
 	}
 }
