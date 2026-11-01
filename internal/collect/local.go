@@ -359,6 +359,13 @@ func (l *Local) readMem(s *Snapshot) error {
 	if mem.Available == 0 {
 		mem.Available = mem.Free + mem.Buffers + mem.Cached
 	}
+	// The ZFS ARC (TrueNAS, Proxmox) is kernel memory that MemAvailable doesn't count, though ZFS hands it
+	// back under pressure down to c_min — count that part as cache, like htop and free do on ZFS boxes.
+	if b, err := os.ReadFile(l.proc("spl/kstat/zfs/arcstats")); err == nil {
+		arc := arcReclaimable(string(b))
+		mem.Cached += arc
+		mem.Available = min(mem.Available+arc, mem.Total)
+	}
 	mem.Used = sub(mem.Total, mem.Available)
 	mem.Percent = pct(mem.Used, mem.Total)
 	s.Mem = mem
@@ -366,6 +373,24 @@ func (l *Local) readMem(s *Snapshot) error {
 	s.Swap.Used = sub(m["SwapTotal"], m["SwapFree"]+m["SwapCached"])
 	s.Swap.Percent = pct(s.Swap.Used, s.Swap.Total)
 	return nil
+}
+
+// arcReclaimable is how much of the ZFS ARC can shrink away: size above c_min, from /proc/spl/kstat/zfs/arcstats.
+func arcReclaimable(arcstats string) uint64 {
+	var size, cmin uint64
+	for _, line := range strings.Split(arcstats, "\n") {
+		f := strings.Fields(line)
+		if len(f) != 3 {
+			continue
+		}
+		switch f[0] {
+		case "size":
+			size = atou(f[2])
+		case "c_min":
+			cmin = atou(f[2])
+		}
+	}
+	return sub(size, cmin)
 }
 
 func (l *Local) readVMStat(cur *rawState) {

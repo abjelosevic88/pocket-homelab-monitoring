@@ -61,3 +61,13 @@ func TestLogQueryRejectsPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestArcReclaimable(t *testing.T) {
+	stats := "13 1 0x01 123 33456 1 2\nname                            type data\nhits                            4    100\nc_min                           4    536870912\nc_max                           4    15674998784\nsize                            4    11489037312\n"
+	if got := arcReclaimable(stats); got != 11489037312-536870912 {
+		t.Fatalf("arcReclaimable = %d", got)
+	}
+	if got := arcReclaimable(""); got != 0 {
+		t.Fatalf("arcReclaimable(empty) = %d", got)
+	}
+}
