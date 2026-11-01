@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/collect"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/store"
 )
 
@@ -177,5 +178,37 @@ func TestChecksAPIAndKumaCompat(t *testing.T) {
 		if a.Metric == "check" {
 			t.Errorf("alert still open after delete: %+v", a)
 		}
+	}
+}
+
+// A server reading must not resolve an open uptime alert (it did, and the next
+// check result fired it again: dozens of notifications a minute).
+func TestReadingKeepsCheckAlertOpen(t *testing.T) {
+	_, s := newHarness(t)
+	ctx := context.Background()
+	u := &store.User{Email: "o@example.com", Name: "o", Role: "admin"}
+	_ = s.store.CreateUser(ctx, u)
+	sv := &store.Server{UserID: u.ID, Name: "Box", Kind: "local", Enabled: true, IntervalS: 5, Color: "#000"}
+	_ = s.store.CreateServer(ctx, sv)
+	s.store.EnsureCheckRules(ctx, sv.ID)
+	s.dropRules()
+	c := &store.Check{ServerID: sv.ID, Name: "Script", Kind: "push", PushToken: "tok", IntervalS: 60, RetryS: 60, TimeoutS: 1, Enabled: true, Notify: true}
+	if err := s.store.SaveCheck(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	s.loadChecks(ctx)
+	s.recordCheck(ctx, c.ID, false, nil, "No push", time.Time{}, false)
+	open := func() int {
+		list, _ := s.store.ListAlerts(ctx, []int64{sv.ID}, true, 0)
+		return len(list)
+	}
+	if open() != 1 {
+		t.Fatalf("want one open alert, got %d", open())
+	}
+	s.evaluate(ctx, *sv, &serverState{}, &collect.Snapshot{}, time.Now())
+	s.recordCheck(ctx, c.ID, false, nil, "No push", time.Time{}, false)
+	all, _ := s.store.ListAlerts(ctx, []int64{sv.ID}, false, 0)
+	if open() != 1 || len(all) != 1 {
+		t.Fatalf("the reading resolved the alert and it fired again: open %d, total %d", open(), len(all))
 	}
 }

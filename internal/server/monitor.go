@@ -480,6 +480,9 @@ func (s *Server) evaluate(ctx context.Context, sv store.Server, st *serverState,
 	}
 	st.mu.Unlock()
 	for _, r := range rules {
+		if ownEvaluator(r.Metric) {
+			continue // job, speed test and uptime rules are judged where their data arrives
+		}
 		if !r.Enabled {
 			s.resolveRule(ctx, sv, r, nil, now)
 			continue
@@ -487,6 +490,13 @@ func (s *Server) evaluate(ctx context.Context, sv store.Server, st *serverState,
 		conds := conditions(r, snap, running)
 		s.apply(ctx, sv, r, conds, now, snap)
 	}
+}
+
+// ownEvaluator reports rules a reading doesn't decide: evaluating them here
+// with no conditions would resolve their open alerts on every reading, and
+// the next job poll, speed test or check result would fire them again.
+func ownEvaluator(metric string) bool {
+	return metric == "job" || isSpeedMetric(metric) || isCheckMetric(metric)
 }
 
 // checkOffline fires offline rules for servers with no fresh reading.
