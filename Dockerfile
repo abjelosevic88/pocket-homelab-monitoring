@@ -49,7 +49,7 @@ VOLUME ["/data"]
 EXPOSE 8080 8193
 USER app
 WORKDIR /data
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD curl -fsS http://localhost:8080/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD curl -fsS "http://localhost:${AGENT_PORT:-${PORT:-8080}}/healthz" || exit 1
 LABEL org.opencontainers.image.title="Pocket Monitoring" \
       org.opencontainers.image.description="Server monitoring with a memory: CPU, memory, disks, temperatures, processes, containers and internet speed of this box and any other, live and as history, with alerts. Also the agent for other machines (pocket-monitoring agent)." \
       org.opencontainers.image.source="https://github.com/abjelosevic88/pocket-homelab-monitoring" \
