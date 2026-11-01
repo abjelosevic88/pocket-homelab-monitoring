@@ -636,6 +636,10 @@ func metricName(m string) string {
 		return "Upload speed"
 	case "speed_ping":
 		return "Ping"
+	case "check":
+		return "Uptime check"
+	case "cert":
+		return "Certificate"
 	}
 	return m
 }
@@ -655,6 +659,8 @@ func fmtValue(metric string, v float64) string {
 		return fmt.Sprintf("%.0f Mbps", v)
 	case "speed_ping":
 		return fmt.Sprintf("%.0f ms", v)
+	case "cert":
+		return fmt.Sprintf("%.0f days", v)
 	}
 	return fmt.Sprintf("%g", v)
 }
@@ -690,7 +696,7 @@ func alertMessage(r store.Rule, c condition, sv store.Server, snap *collect.Snap
 		return "Container " + c.inst + " is not healthy"
 	case "raid":
 		return "RAID array " + c.inst + " is degraded"
-	case "job", "speedtest", "speed_down", "speed_up", "speed_ping":
+	case "job", "speedtest", "speed_down", "speed_up", "speed_ping", "check", "cert":
 		return c.label
 	case "disk":
 		return fmt.Sprintf("Disk %s is %s full (limit %s)", c.label, fmtValue("disk", c.value), fmtValue("disk", r.Threshold))

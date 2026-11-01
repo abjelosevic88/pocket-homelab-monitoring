@@ -26,6 +26,8 @@ export const METRICS: { value: Metric; label: string; help: string; unit: string
   { value: 'speed_down', label: 'Download speed', help: 'The internet download speed measured by the speed test.', unit: 'Mbps', def: 50, below: true, tests: true },
   { value: 'speed_up', label: 'Upload speed', help: 'The internet upload speed measured by the speed test.', unit: 'Mbps', def: 10, below: true, tests: true },
   { value: 'speed_ping', label: 'Ping', help: 'The idle ping to the speed test server.', unit: 'ms', def: 50, tests: true },
+  { value: 'check', label: 'Uptime check down', help: 'A website, port, DNS or push check on the Uptime tab is down (after its own retries). Mute one check from its menu there.', unit: '', def: 0, noThreshold: true },
+  { value: 'cert', label: 'Certificate expiring', help: 'The HTTPS certificate of a website check expires within this many days.', unit: 'days', def: 14, below: true },
 ]
 const TESTS: Option<number>[] = [1, 2, 3, 4, 5].map(n => ({ value: n, label: n === 1 ? 'After one test' : `${n} tests in a row` }))
 const FOR: Option<number>[] = [0, 60, 120, 300, 600, 900, 1800, 3600].map(s => ({ value: s, label: s === 0 ? 'Right away' : `For ${fmtDuration(s).replace('m', ' min').replace('h', ' h')}` }))
@@ -61,6 +63,8 @@ export function RulesTab() {
       case 'speedtest': return r.for_s > 1 ? `${r.for_s} failed tests in a row` : 'A test fails'
       case 'speed_down': case 'speed_up': return `${m?.label} under ${r.threshold} Mbps${r.for_s > 1 ? ` in ${r.for_s} tests in a row` : ''}`
       case 'speed_ping': return `Ping over ${r.threshold} ms${r.for_s > 1 ? ` in ${r.for_s} tests in a row` : ''}`
+      case 'check': return `${r.target ? 'One check' : 'Any uptime check'} goes down${dur}`
+      case 'cert': return `A certificate expires within ${r.threshold} days`
       default: return `${m?.label} above ${r.threshold}%${dur}`
     }
   }

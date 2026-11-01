@@ -13,6 +13,7 @@ import Overview from './pages/Overview'
 import ServerPage from './pages/ServerPage'
 import AlertsPage from './pages/Alerts'
 import Settings from './pages/Settings'
+import StatusPublic from './pages/StatusPublic'
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { status, user, settings } = useApp()
@@ -27,6 +28,7 @@ function Gate({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <Routes>
+      <Route path="/status/:slug" element={<ErrorBoundary where="status"><StatusPublic /></ErrorBoundary>} />
       <Route path="/login" element={<Login mode="login" />} />
       <Route path="/setup" element={<Login mode="setup" />} />
       <Route path="/settings/:tab?" element={<Gate><ErrorBoundary where="settings"><Settings /></ErrorBoundary></Gate>} />

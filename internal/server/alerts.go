@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +25,7 @@ func (s *Server) alertRoutes(r chi.Router) {
 
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
 
-var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true, "job": true, "speedtest": true, "speed_down": true, "speed_up": true, "speed_ping": true}
+var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true, "job": true, "speedtest": true, "speed_down": true, "speed_up": true, "speed_ping": true, "check": true, "cert": true}
 
 func (s *Server) ownedServerIDs(ctx context.Context, uid int64) []int64 {
 	list, _ := s.store.VisibleServers(ctx, uid)
@@ -118,6 +119,10 @@ func applyRule(r *store.Rule, in ruleInput) error {
 	case "speed_ping":
 		if r.Threshold <= 0 {
 			return badRequest("the limit is a ping in milliseconds")
+		}
+	case "cert":
+		if r.Threshold < 1 || r.Threshold > 365 {
+			return badRequest("the limit is a number of days between 1 and 365")
 		}
 	}
 	// speed rules count tests in a row, not seconds
@@ -256,7 +261,13 @@ func (s *Server) alertFired(ctx context.Context, sv store.Server, a *store.Alert
 		icon = "🔴"
 	}
 	title := fmt.Sprintf("%s %s: %s", icon, sv.Name, metricName(a.Metric))
-	s.notifyWatchers(ctx, sv, "alerts", title, a.Message, s.alertLink(sv.ID, a.Metric))
+	switch a.Metric {
+	case "check":
+		title = fmt.Sprintf("%s %s is down", icon, s.checkName(a.Target))
+	case "cert":
+		title = fmt.Sprintf("%s Certificate expiring: %s", icon, s.checkName(a.Target))
+	}
+	s.notifyWatchers(ctx, sv, "alerts", title, a.Message, s.alertLink(sv.ID, a.Metric, a.Target))
 	s.publish(ctx, "monitoring.alert", &sv, map[string]any{"alert_id": a.ID, "metric": a.Metric, "target": a.Target, "severity": a.Severity, "message": a.Message, "value": a.Value})
 }
 
@@ -276,6 +287,10 @@ func (s *Server) alertResolved(ctx context.Context, sv store.Server, a *store.Al
 		body = fmt.Sprintf("RAID array %s is healthy again%s.", a.Target, took)
 	case "speedtest":
 		body = fmt.Sprintf("Speed tests on %s pass again%s.", sv.Name, took)
+	case "check":
+		body = fmt.Sprintf("%s is up again%s.", s.checkName(a.Target), took)
+	case "cert":
+		body = fmt.Sprintf("The certificate of %s was renewed.", s.checkName(a.Target))
 	case "job":
 		if a.Target == "" {
 			body = fmt.Sprintf("Scheduled jobs on %s can be read again%s.", sv.Name, took)
@@ -299,12 +314,16 @@ func (s *Server) alertResolved(ctx context.Context, sv store.Server, a *store.Al
 		}
 	}
 	s.log.Info("alert resolved", "server", sv.Name, "metric", a.Metric, "target", a.Target)
-	s.notifyWatchers(ctx, sv, "resolved", "✅ "+sv.Name+": "+metricName(a.Metric)+" OK", body, s.alertLink(sv.ID, a.Metric))
+	title := "✅ " + sv.Name + ": " + metricName(a.Metric) + " OK"
+	if a.Metric == "check" {
+		title = "✅ " + s.checkName(a.Target) + " is up"
+	}
+	s.notifyWatchers(ctx, sv, "resolved", title, body, s.alertLink(sv.ID, a.Metric, a.Target))
 	s.publish(ctx, "monitoring.resolved", &sv, map[string]any{"alert_id": a.ID, "metric": a.Metric, "target": a.Target, "message": body})
 }
 
 // alertLink opens the server on the tab the alert is about.
-func (s *Server) alertLink(id int64, metric string) string {
+func (s *Server) alertLink(id int64, metric, target string) string {
 	l := s.serverLink(id)
 	switch {
 	case l == "":
@@ -312,6 +331,8 @@ func (s *Server) alertLink(id int64, metric string) string {
 		l += "?tab=internet"
 	case metric == "job":
 		l += "?tab=jobs"
+	case isCheckMetric(metric):
+		l += "?tab=uptime&check=" + url.QueryEscape(target)
 	}
 	return l
 }

@@ -59,6 +59,7 @@ type Server struct {
 	alerts *alertEngine
 	jobs   *jobsHub
 	speed  *speedHub
+	checks *checkHub
 
 	baseCtx context.Context // the app's lifetime (background work outlives requests)
 }
@@ -66,7 +67,7 @@ type Server struct {
 // New creates a server.
 func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Server {
 	ua := "PocketMonitoring/" + Version + " (+https://github.com/abjelosevic88/pocket-homelab-monitoring)"
-	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), alerts: newAlertEngine(), jobs: newJobsHub()}
+	s := &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), alerts: newAlertEngine(), jobs: newJobsHub(), checks: newCheckHub()}
 	home, _ := filepath.Abs(cfg.DataDir)
 	s.speed = newSpeedHub(speedtest.Runner{Bin: cfg.SpeedtestBin, Home: home})
 	s.http = &http.Client{Timeout: 60 * time.Second}
@@ -133,6 +134,7 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	go s.monitorLoop(ctx)
 	go s.jobsLoop(ctx)
 	go s.speedLoop(ctx)
+	go s.checksLoop(ctx)
 	go s.housekeeping(ctx)
 	if s.core.Configured() {
 		go s.coreLoop(ctx)
@@ -162,6 +164,7 @@ func (s *Server) seedUser(ctx context.Context, u *store.User) {
 	for _, r := range defaultRules(sv.ID) {
 		_ = s.store.SaveRule(ctx, &r)
 	}
+	s.store.EnsureCheckRules(ctx, sv.ID)
 	s.dropRules()
 	s.reconcile()
 	s.log.Info("monitoring this box", "server", name, "owner", u.Email)
@@ -181,6 +184,7 @@ func (s *Server) housekeeping(ctx context.Context) {
 			s.store.PruneAlerts(ctx, 180)
 			s.store.PruneJobRuns(ctx, s.cfg.JobsKeepDays)
 			s.store.PruneSpeedTests(ctx)
+			s.store.PruneChecks(ctx)
 			_ = s.store.PurgeSessions(ctx)
 		}
 		n++
@@ -214,6 +218,8 @@ func (s *Server) Router() http.Handler {
 		r.Get("/metrics", s.handleMetrics)
 	}
 
+	s.kumaRoutes(r)
+
 	r.Get("/agent/v1/snapshot", s.handleAgentSnapshot)
 	r.Get("/agent/v1/logs", s.handleAgentLogs)
 
@@ -237,6 +243,7 @@ func (s *Server) Router() http.Handler {
 			s.alertRoutes(r)
 			s.jobRoutes(r)
 			s.speedRoutes(r)
+			s.checkRoutes(r)
 
 			r.Get("/users", s.handleListUsers)
 			r.Post("/users", s.handleCreateUser)
@@ -375,7 +382,7 @@ func (s *Server) coreLoop(ctx context.Context) {
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "monitoring", Name: "Pocket Monitoring",
-		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes, containers and the internet connection's speed, live and as history, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
+		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes, containers and the internet connection's speed, live and as history, uptime checks of websites, ports, DNS and script heartbeats, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "MONITORING",
 		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest"},
@@ -454,6 +461,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "pocket_monitoring_rows{table=%q} %d\n", k, v)
 	}
 	s.speedMetrics(ctx, w)
+	s.checkMetrics(w)
 }
 
 // ---------- static / SPA ----------

@@ -78,6 +78,17 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
   A failed or slow scheduled test gets a second look 10 minutes later, a test can wait while the box is
   busy moving data (and every test records how busy it was), notes per test, CSV export, and an import
   of Speedtest Tracker's `database.sqlite` so the history comes along.
+- **Uptime:** checks of websites (status code, a word that must or mustn't be on the page, the HTTPS
+  certificate's expiry), TCP ports, DNS lookups at the resolver of your choice, and **push heartbeats**
+  that scripts and cron jobs send to `/api/push/<token>` — no call within the window counts as a failure.
+  Each check retries before it counts as down, keeps every result for a week and uptime per day for 13
+  months, and shows a beat bar, response-time chart and every outage. Checks run from the machine the app
+  runs on. A public **status page** (`/status/<slug>`) lists the checks you pick — names, up or down and
+  uptime only. It is a drop-in for **Uptime Kuma**: Kuma's push URLs (`/api/push/<token>?status=up&msg=&ping=`),
+  its status page JSON (`/api/status-page/<slug>`, `/api/status-page/heartbeat/<slug>` — Homepage's
+  `uptimekuma` widget reads it) and its `monitor_status` / `monitor_response_time` lines on `/metrics`
+  all work, and an import takes Kuma's JSON backup — or, with [`scripts/kuma-export.py`](scripts/kuma-export.py)
+  run on a copy of `kuma.db`, its history too — keeping push tokens so scripts only change the host.
 
 ## Alerts
 
@@ -92,6 +103,8 @@ was left enabled without a running timer; mute one job from its menu.
 Speed test rules count *tests in a row* instead of minutes: *speed test failed* (the connection is down),
 *download* or *upload under* so many Mbps, *ping over* so many ms. Turning scheduled tests on adds them,
 starting from the minimums you set.
+Uptime checks have two rules: *uptime check down* (after the check's own retries; mute one check from its
+menu) and *certificate expiring* within so many days (14 by default).
 
 ## More machines
 

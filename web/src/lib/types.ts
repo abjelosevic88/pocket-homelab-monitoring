@@ -199,7 +199,7 @@ export interface History {
 
 // ---- alerts ----
 
-export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job' | 'speedtest' | 'speed_down' | 'speed_up' | 'speed_ping'
+export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job' | 'speedtest' | 'speed_down' | 'speed_up' | 'speed_ping' | 'check' | 'cert'
 
 // ---- internet speed tests ----
 
@@ -390,3 +390,21 @@ export interface SystemInfo {
   db_size?: number
   users?: number
 }
+
+// ---- uptime checks ----
+
+export type CheckKind = 'http' | 'tcp' | 'dns' | 'push'
+/** 0 down, 1 up, 2 pending (failing, retrying), 3 maintenance — Uptime Kuma's numbers. */
+export interface Beat { t: number; s: number; ms: number | null; msg?: string }
+export interface Check {
+  id: number; server_id: number; name: string; kind: CheckKind; target: string; port: number; method: string
+  keyword: string; invert_keyword: boolean; status_codes: string; ignore_tls: boolean; follow_redirects: boolean
+  dns_server: string; dns_type: string; push_token: string; interval_s: number; retry_s: number; timeout_s: number; retries: number
+  enabled: boolean; notify: boolean; public: boolean; group: string; notes: string; source_ref?: string; created_at: string
+  status: number; fails: number; last_at: number; last_ms: number | null; last_msg: string; changed_at: number; cert_expires: number
+  uptime_24h: number | null; uptime_30d: number | null; beats: Beat[]; next_at?: string
+}
+export interface StatusPage { server_id: number; slug: string; title: string; description: string; enabled: boolean }
+export interface ChecksInfo { available: boolean; reason: string; owner: boolean; checks: Check[]; status_page: StatusPage | null; push_base: string; base_url: string }
+export interface CheckEvent { check_id: number; t: number; s: number; msg: string }
+export interface CheckHistory { range: string; step_s: number; points: { t: number; ms: number | null; up: number; down: number }[]; uptime: number | null; avg_ms: number | null; events: CheckEvent[] }

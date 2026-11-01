@@ -18,15 +18,16 @@ import { ContainerTable, ProcessTable } from './server/Tables'
 import { LogsView } from './server/Logs'
 import { JobsView } from './server/Jobs'
 import { InternetStrip, InternetView } from './server/Internet'
+import { UptimeStrip, UptimeView } from './server/Uptime'
 
 export const RANGES: { value: RangeName; label: string; long: string }[] = [
   { value: 'live', label: 'Live', long: 'Live (last 15 minutes)' }, { value: '1h', label: '1h', long: 'Last hour' }, { value: '6h', label: '6h', long: 'Last 6 hours' },
   { value: '24h', label: '24h', long: 'Last 24 hours' }, { value: '7d', label: '7d', long: 'Last 7 days' }, { value: '30d', label: '30d', long: 'Last 30 days' },
 ]
-type Section = 'overview' | 'processes' | 'containers' | 'jobs' | 'internet' | 'logs' | 'io' | 'system'
+type Section = 'overview' | 'processes' | 'containers' | 'jobs' | 'uptime' | 'internet' | 'logs' | 'io' | 'system'
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'activity' }, { id: 'processes', label: 'Processes', icon: 'list' },
-  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'internet', label: 'Internet', icon: 'wifi' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
+  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'uptime', label: 'Uptime', icon: 'globe' }, { id: 'internet', label: 'Internet', icon: 'wifi' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
 ]
 
 /** Polls `fn` every `ms` while the tab is visible; keeps the last good value. */
@@ -63,7 +64,7 @@ export default function ServerPage() {
   const server = servers.find(s => s.id === sid)
   const range = (RANGES.find(r => r.value === search.get('range'))?.value || settings?.default_range || 'live') as RangeName
   // speed tests run where the app runs, so only that server has the Internet tab
-  const sections = SECTIONS.filter(x => x.id !== 'internet' || server?.kind === 'local')
+  const sections = SECTIONS.filter(x => (x.id !== 'internet' && x.id !== 'uptime') || server?.kind === 'local')
   const section = (sections.find(s => s.id === search.get('tab'))?.id || 'overview') as Section
   const setParam = (k: string, v: string, def: string) => setSearch(p => { const n = new URLSearchParams(p); if (v === def) n.delete(k); else n.set(k, v); return n }, { replace: true })
   const setRange = (r: RangeName) => setParam('range', r, settings?.default_range || 'live')
@@ -112,7 +113,7 @@ export default function ServerPage() {
       sub={<span className="row"><ServerState status={server.status} label />{serverSubtitle(server)}</span>}
       controls={rangeControl} loading={snap.loading || hist.loading} onKey={onKey}
       extraCommands={[...RANGES.map((r, i) => ({ id: 'r' + r.value, label: `Range: ${r.long}`, icon: 'clock', hint: String(i + 1), group: 'This server', run: () => { setSection('overview'); setRange(r.value) } })),
-        ...(server.kind === 'local' ? [{ id: 'internet', label: 'Internet speed tests', icon: 'wifi', group: 'This server', run: () => setSection('internet') }] : [])]}>
+        ...(server.kind === 'local' ? [{ id: 'internet', label: 'Internet speed tests', icon: 'wifi', group: 'This server', run: () => setSection('internet') }, { id: 'uptime', label: 'Uptime checks', icon: 'globe', group: 'This server', run: () => setSection('uptime') }] : [])]}>
       <div className="page-inner">
         <div className="srv-bar">
           <Tabs tabs={sections.map(x => ({ ...x, label: x.id === 'containers' && s?.containers?.length ? `${x.label} ${s.containers.length}` : x.label }))} value={section} onChange={setSection} />
@@ -133,6 +134,7 @@ export default function ServerPage() {
           <div className={`srv-content ${snap.loading && !s ? 'refetching' : ''}`}>
             {section === 'overview' && <>
               <QuickTiles snap={s} />
+              {server.kind === 'local' && <UptimeStrip server={server} onOpen={() => setSection('uptime')} />}
               {server.kind === 'local' && <InternetStrip server={server} onOpen={() => setSection('internet')} />}
               <HistoryCharts data={hist.data} range={range} loading={hist.loading} />
               <div className="panel-grid">
@@ -146,6 +148,7 @@ export default function ServerPage() {
             {section === 'processes' && <ProcessTable snap={s} />}
             {section === 'containers' && <ContainerTable snap={s} onLogs={server.kind !== 'glances' && server.role === 'owner' ? openLogs : undefined} />}
             {section === 'jobs' && <JobsView server={server} />}
+            {section === 'uptime' && <UptimeView server={server} initial={Number(search.get('check')) || undefined} />}
             {section === 'internet' && <InternetView server={server} />}
             {section === 'logs' && <LogsView server={server} snap={s} initial={logsFor} onPick={openLogs} />}
             {section === 'io' && <div className="stack"><NetPanel snap={s} /><DiskPanel snap={s} /><FsPanel snap={s} /></div>}
