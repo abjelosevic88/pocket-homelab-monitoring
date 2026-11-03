@@ -26,6 +26,10 @@ type Snapshot struct {
 	Procs      Procs       `json:"procs"`
 	Containers []Container `json:"containers"`
 	RAID       []RAID      `json:"raid"`
+	// Drives is the SMART health of every disk; DrivesAt is when they were
+	// last read (every few minutes, zero when SMART can't be read here).
+	Drives   []Drive   `json:"drives,omitempty"`
+	DrivesAt time.Time `json:"drives_at"`
 	// ContainersAt is when the container list was last read (it is read
 	// less often than the rest); zero when there is no container engine.
 	ContainersAt time.Time `json:"containers_at"`

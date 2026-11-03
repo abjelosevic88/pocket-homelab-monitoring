@@ -84,6 +84,9 @@ export interface Summary {
   containers_running: number
   containers_total: number
   containers_unhealthy: number
+  drives_total: number
+  drives_warning: number
+  drives_failed: number
 }
 
 export interface Server {
@@ -142,6 +145,35 @@ export interface Container {
 }
 export interface RAID { name: string; level: string; state: string; devices: number; active: number; degraded: boolean; sync?: number }
 
+// ---- drive health (SMART) ----
+
+export type DriveStatus = 'passed' | 'warning' | 'failed'
+/** One SMART attribute (ATA) or NVMe health log field. key = "5" or "media_errors". */
+export interface DriveAttr {
+  key: string; id?: number; name: string; value?: number; worst?: number; thresh?: number; raw: number; raw_str?: string
+  prefail?: boolean; failed?: 'now' | 'past'; status?: 'warn' | 'fail'; note?: string
+}
+export interface SelfTest { type: string; result: string; passed: boolean; failed: boolean; hours: number; running?: boolean }
+export interface Drive {
+  key: string; name: string; type: string; protocol: string; model: string; family?: string; serial: string; wwn?: string; firmware?: string
+  capacity: number; rpm: number; form_factor?: string; interface?: string
+  status: DriveStatus; problems?: string[]; warnings?: string[]; smart_passed: boolean | null
+  temp: number; temp_max?: number; temp_limit: number; power_on_hours: number; power_cycles: number; unsafe_shutdowns?: number
+  wear?: number; spare?: number; spare_threshold?: number; critical_warning?: number; media_errors?: number; error_log?: number
+  reallocated?: number; pending?: number; uncorrectable?: number; crc_errors?: number; errors: number; written?: number; read?: number
+  attrs: DriveAttr[]; self_tests?: SelfTest[]; standby?: boolean; error?: string; read_at: string
+}
+/** A drive as the hub keeps it: the latest reading, its server, and whether the last pass still found it. */
+export interface DriveView {
+  server_id: number; server_name: string; server_color: string; role: 'owner' | 'viewer'
+  drive: Drive; first_seen: number; last_seen: number; missing: boolean
+}
+/** One hour of a drive's history (unix seconds); attrs = raw value by attribute key. */
+export interface DrivePoint {
+  t: number; status: string; temp: number | null; hours: number | null; wear: number | null; spare: number | null
+  errors: number | null; written: number | null; read: number | null; attrs?: Record<string, number>
+}
+
 export interface Snapshot {
   time: string
   source: 'local' | 'agent' | 'glances'
@@ -157,6 +189,8 @@ export interface Snapshot {
   procs: Procs
   containers: Container[]
   raid: RAID[]
+  drives?: Drive[]
+  drives_at: string
   containers_at: string
   errors?: string[]
 }
@@ -199,7 +233,7 @@ export interface History {
 
 // ---- alerts ----
 
-export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job' | 'speedtest' | 'speed_down' | 'speed_up' | 'speed_ping' | 'check' | 'cert'
+export type Metric = 'cpu' | 'mem' | 'swap' | 'load' | 'disk' | 'temp' | 'offline' | 'container' | 'raid' | 'job' | 'speedtest' | 'speed_down' | 'speed_up' | 'speed_ping' | 'check' | 'cert' | 'drive' | 'drive_errors' | 'drive_wear' | 'drive_temp'
 
 // ---- internet speed tests ----
 

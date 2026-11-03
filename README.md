@@ -59,6 +59,13 @@ Screenshots: this box with a day of demo history (`DEMO_DATA=true`), an agent an
 - **Container logs:** any container's log, or every running container merged by time; follow new lines
   live, filter, errors only, times, wrap, the last 200–5,000 lines, download. Logs are for the server's
   owner only (they tend to hold secrets); agents serve them too, Glances doesn't.
+- **Drives:** the SMART health of every disk, a drop-in for Scrutiny: failing, worth watching or
+  healthy in words (the drive's own verdict, attributes at the maker's failure threshold, reallocated,
+  pending and uncorrectable sectors, NVMe media errors, spare space and wear, failed self-tests, running
+  hot), temperature, power-on time, data written; hourly history of temperature, bad sectors, wear and
+  every attribute; the self-test log. A drive that stops answering shows as *missing* — a dying disk
+  often just disappears. One page lists every drive of every server, worst first, and an import brings
+  Scrutiny's history over. Read with `smartctl` every 15 minutes, without waking sleeping disks.
 - **Scheduled jobs:** every systemd timer (your own `--user` ones and the ones an admin put in `/etc`)
   with its schedule in words, last run, how long it took, the last line it wrote, the next run and the
   week's runs and failures, grouped (Music, Backups, System… guessed from the name, yours to change).
@@ -103,6 +110,9 @@ was left enabled without a running timer; mute one job from its menu.
 Speed test rules count *tests in a row* instead of minutes: *speed test failed* (the connection is down),
 *download* or *upload under* so many Mbps, *ping over* so many ms. Turning scheduled tests on adds them,
 starting from the minimums you set.
+Drives have four: *drive failing* (critical; also when a drive has been missing for an hour), *bad
+sectors* over a count (0 by default — set it to today's count to hear only about new ones), *wear* over
+80 % and *drive temperature* over the drive's own limit for 10 minutes.
 Uptime checks have two rules: *uptime check down* (after the check's own retries; mute one check from its
 menu) and *certificate expiring* within so many days (14 by default).
 
@@ -112,13 +122,15 @@ Run the agent on any Linux machine and add it under *Settings → Servers*:
 
 ```sh
 docker run -d --name pocket-monitoring-agent --restart unless-stopped \
-  --user 0:0 --pid host --network host \
+  --user 0:0 --privileged --pid host --network host \
   -v /:/host/root:ro,rslave -v /var/run/docker.sock:/var/run/docker.sock:ro \
   -e AGENT_TOKEN=$(openssl rand -hex 24) -e AGENT_PORT=8193 \
   ghcr.io/abjelosevic88/pocket-homelab-monitoring:latest agent
 ```
 
-or the binary itself: `AGENT_TOKEN=… pocket-monitoring agent`. It serves a few authenticated endpoints
+(`--privileged` is for drive health: SMART needs root and the raw disks — leave it out and everything
+but the Drives tab still works) or the binary itself, as root for drive health and `smartctl` on the
+PATH: `AGENT_TOKEN=… pocket-monitoring agent`. It serves a few authenticated endpoints
 and keeps nothing on disk but the list of jobs you paused. The binary agent also reports the machine's
 systemd timers (the container can't see systemd).
 
@@ -154,6 +166,9 @@ services:
       - ./data:/data
       - /:/host/root:ro,rslave                          # file systems and /etc/os-release
       - /var/run/docker.sock:/var/run/docker.sock:ro    # containers
+    # drive health (SMART) of this box's disks: root and the raw disks
+    user: "0:0"
+    privileged: true
 ```
 
 Open it, create the first account, and *This server* is already there. Everything else is in

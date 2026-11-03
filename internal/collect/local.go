@@ -49,6 +49,7 @@ func env(k, def string) string {
 type Local struct {
 	P        Paths
 	Docker   *Docker
+	SMART    *SMART
 	TopProcs int
 	Version  string
 
@@ -127,6 +128,13 @@ func (l *Local) Collect(ctx context.Context) (*Snapshot, error) {
 			fail("containers", err)
 		}
 		l.tagContainers(s)
+	}
+	if !l.SMART.Missing() {
+		ds, at, err := l.SMART.Latest()
+		s.Drives, s.DrivesAt = ds, at
+		if err != nil {
+			fail("drives (SMART)", err)
+		}
 	}
 	return s, nil
 }

@@ -51,7 +51,8 @@ export function ServerDialog({ server, onClose, onSaved }: { server?: Server; on
       onClose()
     } catch (e) { toast(errMsg(e), 'err') } finally { setBusy(false) }
   }
-  const canSave = !busy && (!remote || !!f.url.trim()) && (!isNew || f.kind !== 'agent' || !!f.token)
+  const switched = !isNew && f.kind !== server!.kind
+  const canSave = !busy && (!remote || !!f.url.trim()) && ((!isNew && !switched) || f.kind !== 'agent' || !!f.token)
 
   return (
     <Modal title={isNew ? 'Add a server' : `Edit ${server!.name}`} onClose={onClose} size="lg" footer={<>
@@ -69,9 +70,9 @@ export function ServerDialog({ server, onClose, onSaved }: { server?: Server; on
           <div className="callout info"><Icon name="info" size={15} /><span>This is the machine Pocket Monitoring runs on. It is read straight from the host — nothing to connect.</span></div>
         ) : (
           <>
-            {isNew && (
-              <Field label="How to reach it" group help={f.kind === 'agent'
-                ? 'Run the small agent on that machine (see “Add another machine” in Settings → Servers). It has everything: processes, containers, sensors, RAID.'
+            {remote && (
+              <Field label="How to reach it" group help={switched ? 'Switching keeps the server’s history, rules and alerts; give the new address and its token or password.' : f.kind === 'agent'
+                ? 'Run the small agent on that machine (see “Add another machine” in Settings → Servers). It has everything: processes, containers, sensors, RAID, drive health.'
                 : 'Any machine already running Glances 4 in web-server mode (glances -w). No agent needed.'}>
                 <Segmented label="Kind" value={f.kind} onChange={k => set('kind', k)} options={[
                   { value: 'agent', label: <span className="row"><Icon name="zap" size={14} />Pocket agent</span> },

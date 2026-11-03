@@ -111,8 +111,8 @@ func (s *Store) CreateServer(ctx context.Context, sv *Server) error {
 
 // UpdateServer writes the editable fields.
 func (s *Store) UpdateServer(ctx context.Context, sv *Server) error {
-	_, err := s.DB.ExecContext(ctx, `UPDATE servers SET name = ?, url = ?, username = ?, secret = ?, color = ?, enabled = ?, interval_s = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-		sv.Name, sv.URL, sv.Username, sv.Secret, sv.Color, boolInt(sv.Enabled), sv.IntervalS, sv.SortOrder, Now(), sv.ID)
+	_, err := s.DB.ExecContext(ctx, `UPDATE servers SET name = ?, kind = ?, url = ?, username = ?, secret = ?, color = ?, enabled = ?, interval_s = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+		sv.Name, sv.Kind, sv.URL, sv.Username, sv.Secret, sv.Color, boolInt(sv.Enabled), sv.IntervalS, sv.SortOrder, Now(), sv.ID)
 	sv.HasSecret = sv.Secret != ""
 	return err
 }

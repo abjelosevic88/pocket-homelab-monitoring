@@ -16,6 +16,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const mine = servers.filter(s => s.role === 'owner')
   const shared = servers.filter(s => s.role !== 'owner')
   const crit = alerts.some(a => a.severity === 'critical')
+  const drivesBad = servers.reduce((n, s) => n + (s.summary?.drives_failed || 0), 0)
   return (
     <aside className="sidebar" aria-label="Servers">
       <div className="sb-brand">
@@ -27,6 +28,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav className="sb-nav" aria-label="Pages">
         <NavLink to="/" end className="sb-nav-item" onClick={onNavigate}><Icon name="grid" size={16} />Overview</NavLink>
+        <NavLink to="/drives" className="sb-nav-item" onClick={onNavigate}><Icon name="disk" size={16} />Drives
+          {drivesBad > 0 && <span className="badge danger" title={`${drivesBad} failing`}>{drivesBad}</span>}</NavLink>
         <NavLink to="/alerts" className="sb-nav-item" onClick={onNavigate}><Icon name="bell" size={16} />Alerts
           {alerts.length > 0 && <span className={`badge ${crit ? 'danger' : 'warn'}`} title={`${alerts.length} active`}>{alerts.length}</span>}</NavLink>
       </nav>

@@ -70,6 +70,10 @@ func RunAgent(ctx context.Context, cfg *config.Config, log *slog.Logger, jobsOnl
 	l := collect.NewLocal(Version)
 	l.Docker = collect.NewDocker(cfg.DockerHost)
 	go l.Docker.Run(ctx, cfg.DockerInterval)
+	if cfg.SMART {
+		l.SMART = collect.NewSMART(cfg.SMARTBin, cfg.SMARTDevices, cfg.SMARTExclude)
+		go l.SMART.Run(ctx, cfg.SMARTInterval)
+	}
 	var mu sync.Mutex
 	var last *collect.Snapshot
 	go func() {
@@ -112,7 +116,7 @@ func RunAgent(ctx context.Context, cfg *config.Config, log *slog.Logger, jobsOnl
 		}
 		serveAgentLogs(w, r, l.Docker)
 	})
-	log.Info("pocket-monitoring agent started", "version", Version, "addr", agentAddr(cfg), "docker", !l.Docker.Missing(), "root", l.P.Root, "jobs", jr != nil)
+	log.Info("pocket-monitoring agent started", "version", Version, "addr", agentAddr(cfg), "docker", !l.Docker.Missing(), "smart", !l.SMART.Missing(), "root", l.P.Root, "jobs", jr != nil)
 	return listenAgent(ctx, agentAddr(cfg), mux)
 }
 

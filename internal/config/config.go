@@ -60,6 +60,14 @@ type Config struct {
 	DockerHost     string        // unix:///var/run/docker.sock (default) or tcp://…
 	DockerInterval time.Duration // how often container stats are read
 
+	// Drive health (SMART) through smartctl, read by the local collector and
+	// the agent. It needs root and the disks (run the container privileged).
+	SMART         bool
+	SMARTInterval time.Duration // how often every drive is read
+	SMARTBin      string        // smartctl
+	SMARTDevices  []string      // "/dev/sda:sat,/dev/nvme0"; empty = smartctl --scan-open
+	SMARTExclude  []string      // devices to leave out
+
 	// Agent: with AGENT_TOKEN set, /agent/v1/snapshot answers other Pocket
 	// Monitoring hubs (and `pocket-monitoring agent` listens on AGENT_PORT).
 	AgentToken string
@@ -161,6 +169,11 @@ func Load() (*Config, error) {
 		LocalInterval:  envDuration("LOCAL_INTERVAL", 5*time.Second),
 		DockerHost:     env("DOCKER_HOST", ""),
 		DockerInterval: envDuration("DOCKER_INTERVAL", 15*time.Second),
+		SMART:          envBool("SMART", true),
+		SMARTInterval:  envDuration("SMART_INTERVAL", 15*time.Minute),
+		SMARTBin:       env("SMARTCTL", "smartctl"),
+		SMARTDevices:   splitList(env("SMART_DEVICES", "")),
+		SMARTExclude:   splitList(env("SMART_EXCLUDE", "")),
 		AgentToken:     env("AGENT_TOKEN", ""),
 		AgentPort:      envInt("AGENT_PORT", 8193),
 
@@ -196,6 +209,9 @@ func Load() (*Config, error) {
 	}
 	if c.DockerInterval < 5*time.Second {
 		c.DockerInterval = 5 * time.Second
+	}
+	if c.SMARTInterval < time.Minute {
+		c.SMARTInterval = time.Minute
 	}
 	if c.JobsInterval < 15*time.Second {
 		c.JobsInterval = 15 * time.Second

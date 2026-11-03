@@ -17,6 +17,11 @@ Everything is an environment variable; nothing is required.
 | `LOCAL_INTERVAL` | `5s` | how often this box is read |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | or `tcp://host:2375`; Podman's socket works too |
 | `DOCKER_INTERVAL` | `15s` | how often container stats are read |
+| `SMART` | `true` | read every drive's health with `smartctl` (web app and agent; needs root and the disks, see below) |
+| `SMART_INTERVAL` | `15m` | how often every drive is read (a sleeping disk isn't woken up for it, except once a day) |
+| `SMART_DEVICES` | – | comma-separated devices with an optional type instead of `smartctl --scan-open`: `/dev/sda:sat,/dev/nvme0` |
+| `SMART_EXCLUDE` | – | devices to leave out: `/dev/sdc` |
+| `SMARTCTL` | `smartctl` | its name or path (the image ships smartmontools 7.5) |
 | `HOST_PROC` / `HOST_SYS` / `HOST_ROOT` | `/proc` / `/sys` / `/host/root` if mounted | where the host is visible |
 | `AGENT_TOKEN` | – | agent mode: required; web app: lets another hub read this box at `/agent/v1/snapshot` |
 | `AGENT_PORT` | `8193` | agent and jobs-helper mode |
@@ -42,6 +47,19 @@ needs `pid: host` (processes, CPU and memory are host-wide anyway), `network_mod
 interfaces), `/` mounted read-only at `/host/root` (free space of every file system, `/etc/os-release`,
 user names) and the Docker socket (containers). The image runs as uid 1000: add the docker group's id
 with `group_add`, or run the agent as root (it reads other users' process I/O too, like Glances does).
+
+**Drive health** asks the disks themselves, which only root with raw access may do: run the container as
+root and privileged (`user: "0:0"` and `privileged: true`, or `--user 0:0 --privileged`). Narrower works
+too — the disks as devices plus two capabilities:
+
+```yaml
+    user: "0:0"
+    cap_add: [SYS_RAWIO, SYS_ADMIN]   # SYS_ADMIN for NVMe
+    devices: [/dev/sda, /dev/sdb, /dev/nvme0]
+```
+
+…but then a disk that gets a new name after a reboot or a swap is no longer seen. Without access the
+Drives tab says why; everything else keeps working.
 
 ## Commands
 

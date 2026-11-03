@@ -11,7 +11,7 @@ import { Confirm, Empty, errMsg, Field, Loading, MenuButton, Modal, Segmented, S
 import { METRIC_ICON } from '../Alerts'
 import { Section } from './common'
 
-export const METRICS: { value: Metric; label: string; help: string; unit: string; def: number; target?: 'mount' | 'sensor' | 'container'; noThreshold?: boolean; below?: boolean; tests?: boolean }[] = [
+export const METRICS: { value: Metric; label: string; help: string; unit: string; def: number; target?: 'mount' | 'sensor' | 'container' | 'drive'; noThreshold?: boolean; below?: boolean; tests?: boolean }[] = [
   { value: 'cpu', label: 'CPU', help: 'Whole-machine CPU use.', unit: '%', def: 90 },
   { value: 'mem', label: 'Memory', help: 'Memory in use (cache that can be freed doesn’t count).', unit: '%', def: 90 },
   { value: 'swap', label: 'Swap', help: 'Swap space in use.', unit: '%', def: 80 },
@@ -27,6 +27,10 @@ export const METRICS: { value: Metric; label: string; help: string; unit: string
   { value: 'speed_up', label: 'Upload speed', help: 'The internet upload speed measured by the speed test.', unit: 'Mbps', def: 10, below: true, tests: true },
   { value: 'speed_ping', label: 'Ping', help: 'The idle ping to the speed test server.', unit: 'ms', def: 50, tests: true },
   { value: 'check', label: 'Uptime check down', help: 'A website, port, DNS or push check on the Uptime tab is down (after its own retries). Mute one check from its menu there.', unit: '', def: 0, noThreshold: true },
+  { value: 'drive', label: 'Drive failing', help: 'A drive’s SMART says it is failing — its own health check, an attribute at the maker’s failure threshold, spare space used up, a failed self-test — or a drive stopped answering for an hour (a dead disk often just disappears).', unit: '', def: 0, target: 'drive', noThreshold: true },
+  { value: 'drive_errors', label: 'Drive bad sectors', help: 'Reallocated, pending or uncorrectable sectors (NVMe: media errors) above this count. Any at all is an early warning; set it to today’s count to hear only about new ones.', unit: 'sectors', def: 0, target: 'drive' },
+  { value: 'drive_wear', label: 'Drive wear', help: 'An SSD has used this much of its rated write endurance.', unit: '%', def: 80, target: 'drive' },
+  { value: 'drive_temp', label: 'Drive temperature', help: 'A drive runs hotter than this. 0 uses each drive’s own limit: an NVMe drive’s warning temperature, 55 °C for spinning disks, 70 °C for SATA SSDs.', unit: '°', def: 0, target: 'drive' },
   { value: 'cert', label: 'Certificate expiring', help: 'The HTTPS certificate of a website check expires within this many days.', unit: 'days', def: 14, below: true },
 ]
 const TESTS: Option<number>[] = [1, 2, 3, 4, 5].map(n => ({ value: n, label: n === 1 ? 'After one test' : `${n} tests in a row` }))
@@ -65,6 +69,10 @@ export function RulesTab() {
       case 'speed_ping': return `Ping over ${r.threshold} ms${r.for_s > 1 ? ` in ${r.for_s} tests in a row` : ''}`
       case 'check': return `${r.target ? 'One check' : 'Any uptime check'} goes down${dur}`
       case 'cert': return `A certificate expires within ${r.threshold} days`
+      case 'drive': return `${r.target ? 'This drive' : 'Any drive'} failing or gone`
+      case 'drive_errors': return `${r.target ? 'This drive' : 'Any drive'} with more than ${r.threshold} bad sector${r.threshold === 1 ? '' : 's'}`
+      case 'drive_wear': return `${r.target ? 'This drive' : 'Any drive'} over ${r.threshold}% worn`
+      case 'drive_temp': return `${r.target ? 'This drive' : 'Any drive'} above ${r.threshold ? `${Math.round(toUnit(r.threshold, unit))}°${unit}` : 'its own limit'}${dur}`
       default: return `${m?.label} above ${r.threshold}%${dur}`
     }
   }
@@ -110,15 +118,18 @@ function RuleDialog({ rule, onClose, onSaved }: { rule: Partial<Rule>; onClose: 
   const [f, setF] = useState({ metric: rule.metric || 'cpu', target: rule.target || '', threshold: rule.threshold ?? 90, for_s: rule.for_s ?? 300, severity: rule.severity || 'warning', enabled: rule.enabled ?? true })
   const m = METRICS.find(x => x.value === f.metric)!
   // temperatures are stored in °C and typed in the person's unit
-  const [shown, setShown] = useState(() => String(f.metric === 'temp' ? Math.round(toUnit(f.threshold, unit)) : f.threshold))
+  const isTemp = (x: string) => x === 'temp' || x === 'drive_temp'
+  const showTemp = (v: number) => v === 0 && f.metric === 'drive_temp' ? 0 : Math.round(toUnit(v, unit))
+  const [shown, setShown] = useState(() => String(isTemp(f.metric) ? showTemp(f.threshold) : f.threshold))
   const snap = useAsync(() => api.get<Snapshot>(`${V1}/servers/${rule.server_id}/snapshot`).catch(() => null), [rule.server_id])
   const [busy, setBusy] = useState(false)
-  useEffect(() => { if (!rule.id || f.metric !== rule.metric) { setF(x => ({ ...x, threshold: m.def, target: '', for_s: m.tests ? 2 : x.for_s > 10 || x.for_s === 0 ? x.for_s : 300 })); setShown(String(m.value === 'temp' ? Math.round(toUnit(m.def, unit)) : m.def)) } }, [f.metric]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!rule.id || f.metric !== rule.metric) { setF(x => ({ ...x, threshold: m.def, target: '', for_s: m.tests ? 2 : x.for_s > 10 || x.for_s === 0 ? x.for_s : 300 })); setShown(String(isTemp(m.value) ? (m.def === 0 ? 0 : Math.round(toUnit(m.def, unit))) : m.def)) } }, [f.metric]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const targets: Option<string>[] = (() => {
     const s = snap.data
-    const any = { value: '', label: m.target === 'mount' ? 'Any file system' : m.target === 'sensor' ? 'Any sensor' : 'Any container' }
+    const any = { value: '', label: m.target === 'mount' ? 'Any file system' : m.target === 'sensor' ? 'Any sensor' : m.target === 'drive' ? 'Any drive' : 'Any container' }
     if (!s || !m.target) return [any]
+    if (m.target === 'drive') return [any, ...(s.drives || []).map(x => ({ value: x.key, label: `${x.model} (${x.name.replace('/dev/', '')})`, description: x.serial }))]
     if (m.target === 'mount') return [any, ...s.fs.map(x => ({ value: x.mount, label: x.mount, description: `${x.device} · ${x.type}` }))]
     if (m.target === 'sensor') return [any, ...s.sensors.filter(x => x.kind === 'temp').map(x => ({ value: x.key, label: x.label, description: x.chip }))]
     return [any, ...(s.containers || []).map(x => ({ value: x.name, label: x.name, description: x.image }))]
@@ -128,7 +139,7 @@ function RuleDialog({ rule, onClose, onSaved }: { rule: Partial<Rule>; onClose: 
   const save = async () => {
     const n = parseFloat(shown.replace(',', '.'))
     if (!m.noThreshold && !isFinite(n)) { toast('Enter a number', 'err'); return }
-    const threshold = m.noThreshold ? 0 : f.metric === 'temp' ? (unit === 'F' ? (n - 32) * 5 / 9 : n) : n
+    const threshold = m.noThreshold ? 0 : isTemp(f.metric) && !(f.metric === 'drive_temp' && n === 0) ? (unit === 'F' ? (n - 32) * 5 / 9 : n) : n
     setBusy(true)
     try {
       const body = { ...f, threshold, server_id: rule.server_id }
@@ -146,12 +157,12 @@ function RuleDialog({ rule, onClose, onSaved }: { rule: Partial<Rule>; onClose: 
         <Field label="Watch" group help={m.help}>
           <Select value={f.metric} onChange={v => setF({ ...f, metric: v })} label="Metric" options={METRICS.map(x => ({ value: x.value, label: x.label, icon: <Icon name={METRIC_ICON[x.value]} size={14} /> }))} />
         </Field>
-        {m.target && <Field label={m.target === 'mount' ? 'File system' : m.target === 'sensor' ? 'Sensor' : 'Container'} group>
+        {m.target && <Field label={m.target === 'mount' ? 'File system' : m.target === 'sensor' ? 'Sensor' : m.target === 'drive' ? 'Drive' : 'Container'} group>
           <Select value={f.target} onChange={v => setF({ ...f, target: v })} options={targets} label="Target" searchable />
         </Field>}
         <div className="two-col">
           {!m.noThreshold && (
-            <Field label={m.below ? 'Below' : 'Above'} help={f.metric === 'temp' ? `°${unit}` : m.unit === '%' ? 'percent' : m.unit}>
+            <Field label={m.below ? 'Below' : 'Above'} help={isTemp(f.metric) ? `°${unit}${f.metric === 'drive_temp' ? ' · 0 = the drive’s own limit' : ''}` : m.unit === '%' ? 'percent' : m.unit}>
               <input value={shown} onChange={e => setShown(e.target.value)} inputMode="decimal" />
             </Field>
           )}

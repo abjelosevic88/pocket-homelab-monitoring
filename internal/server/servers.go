@@ -61,6 +61,9 @@ type summary struct {
 	ContainersRunning   int     `json:"containers_running"`
 	ContainersTotal     int     `json:"containers_total"`
 	ContainersUnhealthy int     `json:"containers_unhealthy"`
+	DrivesTotal         int     `json:"drives_total"`
+	DrivesWarning       int     `json:"drives_warning"`
+	DrivesFailed        int     `json:"drives_failed"`
 }
 
 func summarize(snap *collect.Snapshot) *summary {
@@ -74,6 +77,15 @@ func summarize(snap *collect.Snapshot) *summary {
 	x.FSPct, x.FSMount = snap.FullestFS()
 	x.RxBps, x.TxBps = snap.NetTotals()
 	x.ReadBps, x.WriteBps = snap.DiskTotals()
+	x.DrivesTotal = len(snap.Drives)
+	for _, d := range snap.Drives {
+		switch d.Status {
+		case "failed":
+			x.DrivesFailed++
+		case "warning":
+			x.DrivesWarning++
+		}
+	}
 	for _, c := range snap.Containers {
 		if c.State == "running" {
 			x.ContainersRunning++
@@ -200,6 +212,16 @@ func cleanURL(raw string) (string, error) {
 
 // apply copies input onto sv; secret changes are sealed.
 func (s *Server) applyServer(sv *store.Server, in serverInput) error {
+	// another machine can move between Glances and the agent and keep its history
+	if in.Kind != "" && in.Kind != sv.Kind && sv.ID != 0 {
+		if sv.Kind == "local" || (in.Kind != "agent" && in.Kind != "glances") {
+			return badRequest("a server can switch between agent and glances only")
+		}
+		sv.Kind, sv.Username = in.Kind, ""
+		if in.Token == nil && in.Password == nil {
+			sv.Secret = ""
+		}
+	}
 	if in.Name != nil {
 		sv.Name = strings.TrimSpace(*in.Name)
 	}

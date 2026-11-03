@@ -25,7 +25,7 @@ func (s *Server) alertRoutes(r chi.Router) {
 
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
 
-var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true, "job": true, "speedtest": true, "speed_down": true, "speed_up": true, "speed_ping": true, "check": true, "cert": true}
+var metrics = map[string]bool{"cpu": true, "mem": true, "swap": true, "load": true, "disk": true, "temp": true, "offline": true, "container": true, "raid": true, "job": true, "speedtest": true, "speed_down": true, "speed_up": true, "speed_ping": true, "check": true, "cert": true, "drive": true, "drive_errors": true, "drive_wear": true, "drive_temp": true}
 
 func (s *Server) ownedServerIDs(ctx context.Context, uid int64) []int64 {
 	list, _ := s.store.VisibleServers(ctx, uid)
@@ -291,6 +291,8 @@ func (s *Server) alertResolved(ctx context.Context, sv store.Server, a *store.Al
 		body = fmt.Sprintf("%s is up again%s.", s.checkName(a.Target), took)
 	case "cert":
 		body = fmt.Sprintf("The certificate of %s was renewed.", s.checkName(a.Target))
+	case "drive", "drive_errors", "drive_wear", "drive_temp":
+		body = driveResolved(a, took)
 	case "job":
 		if a.Target == "" {
 			body = fmt.Sprintf("Scheduled jobs on %s can be read again%s.", sv.Name, took)
@@ -331,6 +333,8 @@ func (s *Server) alertLink(id int64, metric, target string) string {
 		l += "?tab=internet"
 	case metric == "job":
 		l += "?tab=jobs"
+	case isDriveMetric(metric):
+		l += "?tab=drives&drive=" + url.QueryEscape(target)
 	case isCheckMetric(metric):
 		l += "?tab=uptime&check=" + url.QueryEscape(target)
 	}

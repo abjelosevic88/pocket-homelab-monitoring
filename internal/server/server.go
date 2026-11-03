@@ -77,6 +77,9 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Se
 	if cfg.LocalCollector {
 		local = collect.NewLocal(Version)
 		local.Docker = collect.NewDocker(cfg.DockerHost)
+		if cfg.SMART {
+			local.SMART = collect.NewSMART(cfg.SMARTBin, cfg.SMARTDevices, cfg.SMARTExclude)
+		}
 	}
 	s.mon = newMonitor(local)
 	return s
@@ -130,6 +133,9 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	s.loadAlerts(ctx)
 	if s.mon.local != nil && s.mon.local.Docker != nil {
 		go s.mon.local.Docker.Run(ctx, s.cfg.DockerInterval)
+	}
+	if s.mon.local != nil && !s.mon.local.SMART.Missing() {
+		go s.mon.local.SMART.Run(ctx, s.cfg.SMARTInterval)
 	}
 	go s.monitorLoop(ctx)
 	go s.jobsLoop(ctx)
@@ -185,6 +191,7 @@ func (s *Server) housekeeping(ctx context.Context) {
 			s.store.PruneJobRuns(ctx, s.cfg.JobsKeepDays)
 			s.store.PruneSpeedTests(ctx)
 			s.store.PruneChecks(ctx)
+			s.store.PruneDriveSamples(ctx)
 			_ = s.store.PurgeSessions(ctx)
 		}
 		n++
@@ -241,6 +248,7 @@ func (s *Server) Router() http.Handler {
 
 			s.serverRoutes(r)
 			s.alertRoutes(r)
+			s.driveRoutes(r)
 			s.jobRoutes(r)
 			s.speedRoutes(r)
 			s.checkRoutes(r)

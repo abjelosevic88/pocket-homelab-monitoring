@@ -33,7 +33,7 @@ Every server belongs to the person who added it. Others see it only when it is s
 | POST | `/servers` | `{name, kind: agent\|glances, url, token?, username?, password?, color?, interval_s?}` → `Server` (default alert rules are added) |
 | POST | `/servers/test` | same body → `{ok, hostname, platform, error}` (nothing stored) |
 | GET | `/servers/{id}` | `Server` |
-| PUT | `/servers/{id}` | partial: `name, url, token, username, password, color, interval_s, enabled` (owner) |
+| PUT | `/servers/{id}` | partial: `name, kind, url, token, username, password, color, interval_s, enabled` (owner; `kind` switches between `agent` and `glances` and keeps the history) |
 | DELETE | `/servers/{id}` | owner; history and alerts go with it |
 | POST | `/servers/reorder` | `{ids: number[]}` |
 | GET | `/servers/{id}/snapshot` | `Snapshot` latest full reading (404 `{"error":"no data yet"}` before the first) |
@@ -49,6 +49,22 @@ Every server belongs to the person who added it. Others see it only when it is s
 (another machine running `pocket-monitoring agent`, `url` like `http://10.0.0.5:8193`, `token` = its
 AGENT_TOKEN) or `glances` (a Glances 4 web server, `url` like `http://10.0.0.5:61208`, optional
 `username`/`password`).
+
+## Drives (SMART)
+
+| Method | Path | |
+|---|---|---|
+| GET | `/drives` | `DriveView[]` every drive of the servers I can see |
+| GET | `/servers/{id}/drives` | `DriveView[]` of one server |
+| GET | `/servers/{id}/drives/{key}?days=7\|30\|90\|365\|all` | `{drive: DriveView, history: DrivePoint[]}` (hourly, older than 90 days one a day) |
+| DELETE | `/servers/{id}/drives/{key}` | owner: forget a drive and its history (it comes back if still there) |
+| POST | `/drives/import/scrutiny` | `{url}` → `{points, drives: [{drive, server, points, matched}]}`: Scrutiny's history, matched by serial number to drives already seen |
+
+`DriveView` = `{server_id, server_name, server_color, role, drive, first_seen, last_seen, missing}`;
+`drive` is the latest reading (`key` = cleaned-up serial number, `status` = `passed`/`warning`/`failed`
+with `problems` and `warnings` in words, temperature and its limit, power-on hours, wear, spare, bad
+sector counts, every attribute with its raw value, the self-test log). `missing` = the server's last
+check didn't find it. The snapshot carries the same readings as `drives` with `drives_at`.
 
 ## Alerts
 
@@ -77,6 +93,10 @@ Metrics and what `threshold` means:
 | speedtest | – (fires when the last `for_s` speed tests failed) | – |
 | speed_down / speed_up | Mbps (fires when the last `for_s` successful tests were all under it) | – |
 | speed_ping | ms (fires when the last `for_s` successful tests were all over it) | – |
+| drive | – (fires when a drive's SMART says it's failing, or it stopped answering for an hour) | drive key or '' for any |
+| drive_errors | count of reallocated + pending + uncorrectable sectors (NVMe: media errors) allowed | drive key or '' |
+| drive_wear | percent of the rated write endurance used | drive key or '' |
+| drive_temp | °C, or 0 for each drive's own limit (NVMe warning temperature, 55 for HDDs, 70 for SATA SSDs) | drive key or '' |
 
 For the speed metrics `for_s` is a number of tests in a row (1–10), not seconds.
 

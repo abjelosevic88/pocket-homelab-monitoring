@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import Overview from './pages/Overview'
 import ServerPage from './pages/ServerPage'
 import AlertsPage from './pages/Alerts'
+import DrivesPage from './pages/Drives'
 import Settings from './pages/Settings'
 import StatusPublic from './pages/StatusPublic'
 
@@ -33,6 +34,7 @@ function App() {
       <Route path="/setup" element={<Login mode="setup" />} />
       <Route path="/settings/:tab?" element={<Gate><ErrorBoundary where="settings"><Settings /></ErrorBoundary></Gate>} />
       <Route path="/server/:id" element={<Gate><ErrorBoundary where="server"><ServerPage /></ErrorBoundary></Gate>} />
+      <Route path="/drives" element={<Gate><ErrorBoundary where="drives"><DrivesPage /></ErrorBoundary></Gate>} />
       <Route path="/alerts" element={<Gate><ErrorBoundary where="alerts"><AlertsPage /></ErrorBoundary></Gate>} />
       <Route path="/" element={<Gate><ErrorBoundary where="overview"><Overview /></ErrorBoundary></Gate>} />
       <Route path="*" element={<Navigate to="/" replace />} />

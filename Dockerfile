@@ -38,7 +38,7 @@ RUN set -eu; \
 
 # ---------- 4. runtime ----------
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata curl \
+RUN apk add --no-cache ca-certificates tzdata curl smartmontools \
  && addgroup -g 1000 app && adduser -u 1000 -G app -D -h /data app
 COPY --from=build /out/pocket-monitoring /usr/local/bin/pocket-monitoring
 # Ookla's CLI: free for personal, non-commercial use (https://www.speedtest.net/about/eula);

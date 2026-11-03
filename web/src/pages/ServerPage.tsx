@@ -19,15 +19,16 @@ import { LogsView } from './server/Logs'
 import { JobsView } from './server/Jobs'
 import { InternetStrip, InternetView } from './server/Internet'
 import { UptimeStrip, UptimeView } from './server/Uptime'
+import { DrivesStrip, DrivesView } from './server/Drives'
 
 export const RANGES: { value: RangeName; label: string; long: string }[] = [
   { value: 'live', label: 'Live', long: 'Live (last 15 minutes)' }, { value: '1h', label: '1h', long: 'Last hour' }, { value: '6h', label: '6h', long: 'Last 6 hours' },
   { value: '24h', label: '24h', long: 'Last 24 hours' }, { value: '7d', label: '7d', long: 'Last 7 days' }, { value: '30d', label: '30d', long: 'Last 30 days' },
 ]
-type Section = 'overview' | 'processes' | 'containers' | 'jobs' | 'uptime' | 'internet' | 'logs' | 'io' | 'system'
+type Section = 'overview' | 'processes' | 'containers' | 'drives' | 'jobs' | 'uptime' | 'internet' | 'logs' | 'io' | 'system'
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'activity' }, { id: 'processes', label: 'Processes', icon: 'list' },
-  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'uptime', label: 'Uptime', icon: 'globe' }, { id: 'internet', label: 'Internet', icon: 'wifi' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
+  { id: 'containers', label: 'Containers', icon: 'box' }, { id: 'drives', label: 'Drives', icon: 'disk' }, { id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'uptime', label: 'Uptime', icon: 'globe' }, { id: 'internet', label: 'Internet', icon: 'wifi' }, { id: 'logs', label: 'Logs', icon: 'terminal' }, { id: 'io', label: 'Network & disks', icon: 'network' }, { id: 'system', label: 'System', icon: 'server' },
 ]
 
 /** Polls `fn` every `ms` while the tab is visible; keeps the last good value. */
@@ -64,12 +65,13 @@ export default function ServerPage() {
   const server = servers.find(s => s.id === sid)
   const range = (RANGES.find(r => r.value === search.get('range'))?.value || settings?.default_range || 'live') as RangeName
   // speed tests run where the app runs, so only that server has the Internet tab
-  const sections = SECTIONS.filter(x => (x.id !== 'internet' && x.id !== 'uptime') || server?.kind === 'local')
+  const sections = SECTIONS.filter(x => ((x.id !== 'internet' && x.id !== 'uptime') || server?.kind === 'local') && (x.id !== 'drives' || server?.kind !== 'glances' || !!server?.summary?.drives_total))
   const section = (sections.find(s => s.id === search.get('tab'))?.id || 'overview') as Section
   const setParam = (k: string, v: string, def: string) => setSearch(p => { const n = new URLSearchParams(p); if (v === def) n.delete(k); else n.set(k, v); return n }, { replace: true })
   const setRange = (r: RangeName) => setParam('range', r, settings?.default_range || 'live')
   const setSection = (s: Section) => setParam('tab', s, 'overview')
   const logsFor = search.get('c') || ''
+  const openDrive = (key: string) => setSearch(p => { const n = new URLSearchParams(p); n.set('tab', 'drives'); if (key) n.set('drive', key); else n.delete('drive'); return n }, { replace: false })
   const openLogs = (name: string) => setSearch(p => { const n = new URLSearchParams(p); n.set('tab', 'logs'); if (name) n.set('c', name); else n.delete('c'); return n }, { replace: true })
 
   const interval = Math.max(3, Math.min(server?.interval_s || 5, 10)) * 1000
@@ -116,7 +118,7 @@ export default function ServerPage() {
         ...(server.kind === 'local' ? [{ id: 'internet', label: 'Internet speed tests', icon: 'wifi', group: 'This server', run: () => setSection('internet') }, { id: 'uptime', label: 'Uptime checks', icon: 'globe', group: 'This server', run: () => setSection('uptime') }] : [])]}>
       <div className="page-inner">
         <div className="srv-bar">
-          <Tabs tabs={sections.map(x => ({ ...x, label: x.id === 'containers' && s?.containers?.length ? `${x.label} ${s.containers.length}` : x.label }))} value={section} onChange={setSection} />
+          <Tabs tabs={sections.map(x => ({ ...x, label: x.id === 'containers' && s?.containers?.length ? `${x.label} ${s.containers.length}` : x.id === 'drives' && s?.drives?.length ? `${x.label} ${s.drives.length}` : x.label }))} value={section} onChange={setSection} />
           <span className="spacer" />
           <MenuButton label={`Options for ${server.name}`} align="right" items={actions.items(server)} width={210}><Icon name="more" size={16} /></MenuButton>
         </div>
@@ -134,6 +136,7 @@ export default function ServerPage() {
           <div className={`srv-content ${snap.loading && !s ? 'refetching' : ''}`}>
             {section === 'overview' && <>
               <QuickTiles snap={s} />
+              <DrivesStrip server={server} onOpen={() => setSection('drives')} />
               {server.kind === 'local' && <UptimeStrip server={server} onOpen={() => setSection('uptime')} />}
               {server.kind === 'local' && <InternetStrip server={server} onOpen={() => setSection('internet')} />}
               <HistoryCharts data={hist.data} range={range} loading={hist.loading} />
@@ -147,6 +150,7 @@ export default function ServerPage() {
             </>}
             {section === 'processes' && <ProcessTable snap={s} />}
             {section === 'containers' && <ContainerTable snap={s} onLogs={server.kind !== 'glances' && server.role === 'owner' ? openLogs : undefined} />}
+            {section === 'drives' && <DrivesView server={server} open={search.get('drive') || ''} onOpen={openDrive} />}
             {section === 'jobs' && <JobsView server={server} />}
             {section === 'uptime' && <UptimeView server={server} initial={Number(search.get('check')) || undefined} />}
             {section === 'internet' && <InternetView server={server} />}

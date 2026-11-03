@@ -32,7 +32,10 @@ type serverState struct {
 	sensors map[string]string
 	dbSeen  time.Time
 	running map[string]bool // containers seen running since start
-	cancel  context.CancelFunc
+	// drives this server has had (alerts keep a drive that went missing)
+	drives   map[string]store.DriveSeen
+	drivesAt time.Time // the SMART pass already stored
+	cancel   context.CancelFunc
 }
 
 type monitor struct {
@@ -102,7 +105,7 @@ func (s *Server) syncPollers(ctx context.Context) {
 			continue
 		}
 		st.mu.Lock()
-		changed := sv.URL != st.srv.URL || sv.Secret != st.srv.Secret || sv.Username != st.srv.Username || sv.IntervalS != st.srv.IntervalS
+		changed := sv.Kind != st.srv.Kind || sv.URL != st.srv.URL || sv.Secret != st.srv.Secret || sv.Username != st.srv.Username || sv.IntervalS != st.srv.IntervalS
 		if !changed {
 			st.srv = sv // name, colour: no restart needed
 		}
@@ -117,7 +120,7 @@ func (s *Server) syncPollers(ctx context.Context) {
 			continue
 		}
 		pctx, cancel := context.WithCancel(ctx)
-		st := &serverState{srv: sv, started: time.Now(), cancel: cancel, sensors: s.store.SensorNames(ctx, id), running: map[string]bool{}}
+		st := &serverState{srv: sv, started: time.Now(), cancel: cancel, sensors: s.store.SensorNames(ctx, id), running: map[string]bool{}, drives: s.store.DrivesSeen(ctx, id)}
 		if t := store.ParseTime(sv.LastSeen); !t.IsZero() {
 			st.seen = t
 		}
@@ -265,6 +268,7 @@ func (s *Server) record(ctx context.Context, st *serverState, snap *collect.Snap
 			st.running[c.Name] = true
 		}
 	}
+	drives := noteDrives(st, snap, now)
 	writeSeen := now.Sub(st.dbSeen) > 30*time.Second || hadErr
 	if writeSeen {
 		st.dbSeen = now
@@ -283,6 +287,9 @@ func (s *Server) record(ctx context.Context, st *serverState, snap *collect.Snap
 	}
 	if len(names) > 0 {
 		s.store.SaveSensorNames(ctx, sv.ID, names)
+	}
+	if drives != nil {
+		s.saveDrives(ctx, sv, drives, now)
 	}
 	if writeSeen {
 		s.store.MarkSeen(ctx, sv.ID, store.FormatTime(now), "")
@@ -478,6 +485,10 @@ func (s *Server) evaluate(ctx context.Context, sv store.Server, st *serverState,
 	for k, v := range st.running {
 		running[k] = v
 	}
+	drives := make(map[string]store.DriveSeen, len(st.drives))
+	for k, v := range st.drives {
+		drives[k] = v
+	}
 	st.mu.Unlock()
 	for _, r := range rules {
 		if ownEvaluator(r.Metric) {
@@ -485,6 +496,13 @@ func (s *Server) evaluate(ctx context.Context, sv store.Server, st *serverState,
 		}
 		if !r.Enabled {
 			s.resolveRule(ctx, sv, r, nil, now)
+			continue
+		}
+		if isDriveMetric(r.Metric) {
+			if snap.DrivesAt.IsZero() {
+				continue // no SMART pass yet (an agent restarting): no verdict either way
+			}
+			s.apply(ctx, sv, r, driveConditions(r, snap, drives, now), now, snap)
 			continue
 		}
 		conds := conditions(r, snap, running)
@@ -650,6 +668,14 @@ func metricName(m string) string {
 		return "Uptime check"
 	case "cert":
 		return "Certificate"
+	case "drive":
+		return "Drive health"
+	case "drive_errors":
+		return "Drive errors"
+	case "drive_wear":
+		return "Drive wear"
+	case "drive_temp":
+		return "Drive temperature"
 	}
 	return m
 }
@@ -658,8 +684,12 @@ func fmtValue(metric string, v float64) string {
 	switch metric {
 	case "cpu", "mem", "swap", "disk":
 		return fmt.Sprintf("%.0f%%", v)
-	case "temp":
+	case "temp", "drive_temp":
 		return fmt.Sprintf("%.0f °C", v)
+	case "drive_wear":
+		return fmt.Sprintf("%.0f%%", v)
+	case "drive":
+		return ""
 	case "load":
 		return fmt.Sprintf("%.2f per thread", v)
 	case "speed_down", "speed_up":
@@ -706,6 +736,8 @@ func alertMessage(r store.Rule, c condition, sv store.Server, snap *collect.Snap
 		return "Container " + c.inst + " is not healthy"
 	case "raid":
 		return "RAID array " + c.inst + " is degraded"
+	case "drive", "drive_errors", "drive_wear", "drive_temp":
+		return driveMessage(r, c, snap)
 	case "job", "speedtest", "speed_down", "speed_up", "speed_ping", "check", "cert":
 		return c.label
 	case "disk":
@@ -739,6 +771,10 @@ func defaultRules(serverID int64) []store.Rule {
 		{ServerID: serverID, Metric: "container", ForS: 180, Severity: "warning", Enabled: true},
 		{ServerID: serverID, Metric: "raid", ForS: 0, Severity: "critical", Enabled: true},
 		{ServerID: serverID, Metric: "job", ForS: 0, Severity: "warning", Enabled: true},
+		{ServerID: serverID, Metric: "drive", ForS: 0, Severity: "critical", Enabled: true},
+		{ServerID: serverID, Metric: "drive_errors", Threshold: 0, ForS: 0, Severity: "warning", Enabled: true},
+		{ServerID: serverID, Metric: "drive_wear", Threshold: 80, ForS: 0, Severity: "warning", Enabled: true},
+		{ServerID: serverID, Metric: "drive_temp", Threshold: 0, ForS: 600, Severity: "warning", Enabled: true},
 		{ServerID: serverID, Metric: "load", Threshold: 2, ForS: 900, Severity: "warning", Enabled: false},
 		{ServerID: serverID, Metric: "swap", Threshold: 90, ForS: 600, Severity: "warning", Enabled: false},
 	}
