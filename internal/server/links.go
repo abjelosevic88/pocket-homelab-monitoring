@@ -16,7 +16,7 @@ import (
 // scopes. Every route not listed in linkRoutes stays closed to it.
 
 var linkOffers = []core.Offer{
-	{Scope: "monitoring:read", Name: "See your servers", Description: "Read your servers' status and headline numbers (CPU, memory, disk, temperature) and their alerts — what Pocket Hub shows as a status tile and Pocket Day notes when something went down."},
+	{Scope: "monitoring:read", Name: "See your servers", Description: "Read your servers' status and headline numbers (CPU, memory, disk, temperature), their uptime checks with certificate dates, and their alerts — what Pocket Hub shows as a status tile and Pocket Day notes when something went down."},
 }
 
 type linkRoute struct {
@@ -29,6 +29,8 @@ var linkRoutes = []linkRoute{
 	{"GET", regexp.MustCompile(`^/api/v1/auth/me$`), ""},
 	{"GET", regexp.MustCompile(`^/api/v1/(servers|alerts|changes)$`), "monitoring:read"},
 	{"GET", regexp.MustCompile(`^/api/v1/servers/[0-9]+(/snapshot|/history|/live)?$`), "monitoring:read"},
+	// uptime checks with their certificate dates (Pocket Renewals tracks TLS certificates)
+	{"GET", regexp.MustCompile(`^/api/v1/servers/[0-9]+/checks$`), "monitoring:read"},
 }
 
 var errLinkScope = errors.New("outside the link's scope")
