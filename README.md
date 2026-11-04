@@ -175,7 +175,8 @@ Open it, create the first account, and *This server* is already there. Everythin
 [docs/configuration.md](docs/configuration.md); the HTTP API is in [docs/api.md](docs/api.md).
 
 **Pocket Core.** With `CORE_URL` set it registers as `monitoring`, people sign in with Pocket Core,
-paired phones' tokens work, alerts are published as `monitoring.alert` / `monitoring.resolved`, and
+paired phones' tokens work, alerts are published as `monitoring.alert` / `monitoring.resolved`, an
+uptime check's TLS certificate end date as `monitoring.cert_changed` (when first seen or renewed), and
 other Pocket apps can be linked to read your servers' status (`monitoring:read`).
 
 ## Build

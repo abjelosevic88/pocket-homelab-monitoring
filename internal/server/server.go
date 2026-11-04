@@ -393,7 +393,7 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes, containers and the internet connection's speed, live and as history, uptime checks of websites, ports, DNS and script heartbeats, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "MONITORING",
-		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest"},
+		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest", "monitoring.cert_changed"},
 		Offers:    linkOffers,
 		Uses:      jobAppUses(),
 	}

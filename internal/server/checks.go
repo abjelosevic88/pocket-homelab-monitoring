@@ -256,7 +256,10 @@ func (s *Server) recordCheck(ctx context.Context, id int64, ok bool, ms *float64
 	} else if !push {
 		c.LastMs = nil
 	}
+	// a certificate end date seen for the first time or changed (renewed)
+	certChanged := false
 	if !cert.IsZero() {
+		certChanged = cert.Unix() != c.CertExpires
 		c.CertExpires = cert.Unix()
 	}
 	wait := c.IntervalS
@@ -282,9 +285,22 @@ func (s *Server) recordCheck(ctx context.Context, id int64, ok bool, ms *float64
 		s.touch()
 	}
 	if sv, err := s.store.GetServer(ctx, snap.ServerID); err == nil {
+		if certChanged {
+			s.publishCert(ctx, sv, snap)
+		}
 		s.evaluateChecks(ctx, *sv)
 	}
 	return &snap
+}
+
+// publishCert tells Core (and so Pocket Renewals) a check's certificate end
+// date, once per new date.
+func (s *Server) publishCert(ctx context.Context, sv *store.Server, c store.Check) {
+	exp := time.Unix(c.CertExpires, 0)
+	s.publishAs(ctx, "monitoring.cert_changed", "check:"+itoa64(c.ID), sv, map[string]any{
+		"check_id": c.ID, "name": c.Name, "target": c.Target, "host": certHost(c),
+		"cert_expires": c.CertExpires, "expires_on": exp.In(s.loc()).Format("2006-01-02"),
+	})
 }
 
 func statusWord(st int) string {

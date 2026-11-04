@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/collect"
 	"github.com/abjelosevic88/pocket-homelab-monitoring/internal/store"
 )
@@ -210,5 +211,64 @@ func TestReadingKeepsCheckAlertOpen(t *testing.T) {
 	all, _ := s.store.ListAlerts(ctx, []int64{sv.ID}, false, 0)
 	if open() != 1 || len(all) != 1 {
 		t.Fatalf("the reading resolved the alert and it fired again: open %d, total %d", open(), len(all))
+	}
+}
+
+// A certificate end date goes to Core once when first seen and once per
+// renewal, never on every run, attributed to the server's owner.
+func TestCertChangedEvent(t *testing.T) {
+	_, s := newHarness(t)
+	ctx := context.Background()
+	// a configured client that never starts: events stay in the outbox
+	s.core = core.New("http://127.0.0.1:1", core.Options{DB: s.store.DB})
+	u := &store.User{Email: "o@example.com", Name: "o", Role: "admin"}
+	_ = s.store.CreateUser(ctx, u)
+	sv := &store.Server{UserID: u.ID, Name: "Box", Kind: "local", Enabled: true, IntervalS: 5, Color: "#000"}
+	_ = s.store.CreateServer(ctx, sv)
+	c := &store.Check{ServerID: sv.ID, Name: "Site", Kind: "http", Target: "https://www.example.org:8443/x", IntervalS: 60, RetryS: 60, TimeoutS: 1, Enabled: true}
+	if err := s.store.SaveCheck(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	s.loadChecks(ctx)
+	events := func() []map[string]any {
+		rows, err := s.store.DB.QueryContext(ctx, `SELECT body FROM pocket_outbox ORDER BY created_at, rowid`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []map[string]any
+		for rows.Next() {
+			var b []byte
+			_ = rows.Scan(&b)
+			var e map[string]any
+			_ = json.Unmarshal(b, &e)
+			if e["topic"] == "monitoring.cert_changed" {
+				out = append(out, e)
+			}
+		}
+		return out
+	}
+	ms := 1.0
+	first := time.Date(2027, 1, 15, 12, 0, 0, 0, time.UTC)
+	s.recordCheck(ctx, c.ID, true, &ms, "200 - OK", first, false)
+	s.recordCheck(ctx, c.ID, true, &ms, "200 - OK", first, false)
+	s.recordCheck(ctx, c.ID, false, nil, "timeout", time.Time{}, false)
+	if ev := events(); len(ev) != 1 {
+		t.Fatalf("one event for the first date, got %d", len(ev))
+	}
+	s.recordCheck(ctx, c.ID, true, &ms, "200 - OK", first.Add(90*24*time.Hour), false)
+	ev := events()
+	if len(ev) != 2 {
+		t.Fatalf("a renewal fires again, got %d", len(ev))
+	}
+	e := ev[1]
+	p, _ := e["payload"].(map[string]any)
+	if e["subject"] != "check:"+strconv.FormatInt(c.ID, 10) || p["user_email"] != "o@example.com" || p["server"] != "Box" ||
+		p["name"] != "Site" || p["host"] != "www.example.org" || p["target"] != c.Target ||
+		p["cert_expires"] != float64(first.Add(90*24*time.Hour).Unix()) || p["check_id"] != float64(c.ID) || p["server_id"] != float64(sv.ID) {
+		t.Errorf("event: %+v", e)
+	}
+	if on, _ := p["expires_on"].(string); len(on) != 10 || !strings.HasPrefix(on, "2027-04-1") {
+		t.Errorf("expires_on: %v", p["expires_on"])
 	}
 }

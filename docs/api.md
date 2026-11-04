@@ -132,6 +132,18 @@ Every finished test publishes the Core event `monitoring.speedtest`; `/metrics` 
 | POST | `/servers/{id}/jobs/action` | owner only: `{unit, action: run\|pause\|resume}` |
 | PUT | `/servers/{id}/jobs/settings` | owner only: `{unit, label?, group?, notes?, muted?}` |
 
+## Core events
+
+With Pocket Core linked, these are published (subject `server:<id>` unless noted), each with
+`server_id`, `server` and `user_email` = the server's owner:
+
+| Topic | When | Extra payload |
+|---|---|---|
+| `monitoring.alert` / `monitoring.resolved` | an alert opens / clears | `alert_id`, `metric`, `target`, `message` (+ `severity`, `value`) |
+| `monitoring.server_added` / `monitoring.server_removed` | a server is added / removed | `kind` |
+| `monitoring.speedtest` | a speed test finishes | the result |
+| `monitoring.cert_changed` | an https uptime check's certificate end date is first known or changes (renewal); once per new date. Subject `check:<id>` | `check_id`, `name`, `target`, `host`, `cert_expires` (unix s), `expires_on` (`YYYY-MM-DD`, app timezone) |
+
 ## Agent (on the monitored machine)
 
 `GET /agent/v1/snapshot` with `Authorization: Bearer <AGENT_TOKEN>` → `Snapshot`.

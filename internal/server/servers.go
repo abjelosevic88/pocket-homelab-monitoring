@@ -652,6 +652,11 @@ func (s *Server) handlePeople(w http.ResponseWriter, r *http.Request) {
 
 // publish queues a Core event for the server's owner.
 func (s *Server) publish(ctx context.Context, topic string, sv *store.Server, extra map[string]any) {
+	s.publishAs(ctx, topic, "server:"+itoa64(sv.ID), sv, extra)
+}
+
+// publishAs is publish with its own subject.
+func (s *Server) publishAs(ctx context.Context, topic, subject string, sv *store.Server, extra map[string]any) {
 	if !s.core.Configured() {
 		return
 	}
@@ -659,7 +664,7 @@ func (s *Server) publish(ctx context.Context, topic string, sv *store.Server, ex
 	for k, v := range extra {
 		p[k] = v
 	}
-	if err := core.QueueEvent(ctx, s.store.DB, topic, "server:"+itoa64(sv.ID), p); err != nil {
+	if err := core.QueueEvent(ctx, s.store.DB, topic, subject, p); err != nil {
 		s.log.Debug("queue event", "topic", topic, "err", err)
 	}
 }
