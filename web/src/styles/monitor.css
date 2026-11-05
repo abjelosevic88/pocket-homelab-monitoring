@@ -318,7 +318,6 @@
 .log-ctr.h1::before { background: var(--series-2); }
 .log-ctr.h2::before { background: var(--series-3); }
 .log-ctr.h3::before { background: var(--series-4); }
-.log-ctr:hover { text-decoration: underline; }
 .log-msg { min-width: 0; flex: 1; }
 .log-msg mark { background: rgba(250, 178, 25, .35); color: inherit; border-radius: 2px; }
 .logs-note { padding: 4px 12px 8px; color: var(--muted); font-family: var(--font); font-size: 12px; }
