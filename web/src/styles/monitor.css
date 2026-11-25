@@ -544,3 +544,13 @@
 .drive-sec { display: grid; gap: 10px; }
 .drive-sec h2 { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 0; }
 @media (max-width: 767px) { .drive-stats dd { font-size: 14px; } }
+/* free space on the Drives page: one card per disk or ZFS pool */
+.space-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.space-card { display: grid; gap: 8px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); text-decoration: none; min-width: 0; transition: box-shadow .15s, border-color .15s; }
+.space-card:hover { box-shadow: var(--shadow); border-color: var(--border-strong); text-decoration: none; }
+.space-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.space-head .mono { flex-shrink: 0; max-width: 60%; }
+.space-nums { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; white-space: nowrap; }
+.space-nums .strong { font-size: 15px; }
+.space-row { display: grid; gap: 6px; }
+.space-row .row { gap: 6px; align-items: center; }
