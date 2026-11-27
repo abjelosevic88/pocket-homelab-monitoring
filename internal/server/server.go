@@ -246,6 +246,10 @@ func (s *Server) Router() http.Handler {
 			r.Put("/auth/me", s.handleUpdateMe)
 			r.Get("/changes", s.handleChanges)
 
+			r.Get("/pocket/search", core.SearchHandler(s.pocketSearch))
+			r.Get("/pocket/day/{date}", core.DayHandler(s.pocketDay))
+			r.Get("/pocket/widget", core.WidgetHandler(s.pocketWidget))
+
 			s.serverRoutes(r)
 			s.alertRoutes(r)
 			s.driveRoutes(r)
@@ -391,11 +395,12 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "monitoring", Name: "Pocket Monitoring",
 		Description: "Watches this server and any others you add: CPU, memory, swap, load, network, disks, file systems, temperatures, processes, containers and the internet connection's speed, live and as history, uptime checks of websites, ports, DNS and script heartbeats, with alerts sent to your phone when something runs hot, fills up, crashes or goes offline.",
-		Icon:        "/favicon.svg", Version: Version,
+		Icon:        "/favicon.svg", Version: Version, Category: "System",
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "MONITORING",
-		Publishes: []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest", "monitoring.cert_changed"},
-		Offers:    linkOffers,
-		Uses:      jobAppUses(),
+		Publishes:    []string{"monitoring.alert", "monitoring.resolved", "monitoring.server_added", "monitoring.server_removed", "monitoring.speedtest", "monitoring.cert_changed"},
+		Offers:       linkOffers,
+		Uses:         jobAppUses(),
+		Capabilities: capabilities,
 	}
 	if s.cfg.BaseURL != "" {
 		m.OIDC = &core.OIDCRequest{RedirectURIs: []string{s.cfg.BaseURL + "/api/v1/auth/oidc/callback"}}

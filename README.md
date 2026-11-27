@@ -179,6 +179,13 @@ paired phones' tokens work, alerts are published as `monitoring.alert` / `monito
 uptime check's TLS certificate end date as `monitoring.cert_changed` (when first seen or renewed), and
 other Pocket apps can be linked to read your servers' status (`monitoring:read`).
 
+Pocket Search, Pocket Day and Pocket Hub find Monitoring on their own, with nothing to set up in any
+of them: your uptime checks and servers turn up in Search (`!monitoring jellyfin`, `!status`), Hub
+shows a "Box status" widget with what is down now, then warnings such as a disk nearly full, and CPU,
+memory and disk, and the day's outages and alerts are offered to the journal (a day when nothing went
+wrong stays empty). These only read what the app has already measured; nothing in them runs a check.
+The routes are in [docs/api.md](docs/api.md#pocket-search-pocket-day-and-pocket-hub).
+
 ## Build
 
 ```sh

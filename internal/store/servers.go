@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"time"
 )
 
 const serverCols = `id, user_id, name, kind, url, username, secret, color, enabled, interval_s, sort_order, last_seen, last_error, created_at, updated_at`
@@ -388,6 +389,38 @@ func (s *Store) ListAlerts(ctx context.Context, serverIDs []int64, activeOnly bo
 	}
 	defer rows.Close()
 	out := []Alert{}
+	for rows.Next() {
+		a, err := scanAlert(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *a)
+	}
+	return out, rows.Err()
+}
+
+// AlertsDuring returns the given servers' alerts that were open at some
+// point from from to to: started before to and not resolved before from
+// (oldest first).
+func (s *Store) AlertsDuring(ctx context.Context, serverIDs []int64, from, to time.Time) ([]Alert, error) {
+	out := []Alert{}
+	if len(serverIDs) == 0 {
+		return out, nil
+	}
+	args := []any{}
+	for _, id := range serverIDs {
+		args = append(args, id)
+	}
+	// stored times are RFC 3339 with up to nine decimals: with all nine the
+	// bounds compare as text in the same order as in time
+	const stamp = "2006-01-02T15:04:05.000000000Z"
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+alertCols+` FROM alerts a LEFT JOIN servers sv ON sv.id = a.server_id
+		WHERE a.server_id IN (?`+strings.Repeat(",?", len(serverIDs)-1)+`) AND a.started_at < ? AND (a.resolved_at IS NULL OR a.resolved_at >= ?)
+		ORDER BY a.started_at`, append(args, to.UTC().Format(stamp), from.UTC().Format(stamp))...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	for rows.Next() {
 		a, err := scanAlert(rows)
 		if err != nil {

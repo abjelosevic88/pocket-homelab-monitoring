@@ -132,6 +132,18 @@ Every finished test publishes the Core event `monitoring.speedtest`; `/metrics` 
 | POST | `/servers/{id}/jobs/action` | owner only: `{unit, action: run\|pause\|resume}` |
 | PUT | `/servers/{id}/jobs/settings` | owner only: `{unit, label?, group?, notes?, muted?}` |
 
+## Pocket Search, Pocket Day and Pocket Hub
+
+Monitoring answers three of the routes every Pocket app can offer (`docs/capabilities.md` in Pocket Core), so Pocket Search, Pocket Day and Pocket Hub find it on their own. Each has its own link scope that opens that one route and nothing else; a signed-in person or a personal token can call them too. All three only read what the app has already measured and stored: none of them runs an uptime check or reads a server. A person sees what `GET /servers` and `GET /alerts` show them: their own servers and the ones shared with them. Addresses (`url`) are paths in the app.
+
+| Route | Scope | What |
+|---|---|---|
+| `GET /pocket/search?q&limit` | `pocket:search` | `{items}`: uptime checks by name, group or address, and servers by name, a name match first. A check has `id` `monitor:12`, `kind` monitor, `snippet` "up · 120 ms · 99.95% this month" (down, retrying, paused, not checked yet; the uptime counts from the first of the month), `date` (when it last went up or down) and `url` `/server/{id}?tab=uptime&check={check}`. A server has `id` `server:3`, `kind` server, `snippet` "online · CPU 12% · memory 40% · disk 61%" or "offline", `url` `/server/{id}`. A `q` without a letter or a digit finds nothing |
+| `GET /pocket/day/{date}` | `pocket:day` | `{date, summary, items, metrics}`, empty on a day when nothing went wrong (`?tz=` for the person's time zone, else the box's). Outages (`kind` outage): an uptime check from going down to coming back ("Jellyfin down"), a server that stopped answering ("NAS offline"), with `time`, `end` and `minutes` for their part of the day (one over midnight counts on both days, `sub` says since or until when, or "still going on"). Alerts (`kind` alert) that began that day: a disk filling up, a hot sensor, a failing drive, a certificate running out, with the server in `sub`. `summary` is "1 outage: Jellyfin down 12 min" or "2 outages: Jellyfin down 12 min, NAS offline 3 min; 1 alert". `metrics`: the minutes of outages |
+| `GET /pocket/widget` | `pocket:widget` | `{line, metrics, items, url}`: what is down now first (a server not answering, an uptime check failing, with since when and why), then the open warnings, the worst first. `line` is "All 42 services up", "2 services down, 1 server offline, 1 warning". `metrics`: CPU, memory, the fullest disk and the hottest sensor from the last reading of the box (the server the app runs on, else the first one that answers) |
+
+There is no `POST /pocket/capture`: an uptime check needs a kind and a target, so a quick line cannot become one.
+
 ## Core events
 
 With Pocket Core linked, these are published (subject `server:<id>` unless noted), each with

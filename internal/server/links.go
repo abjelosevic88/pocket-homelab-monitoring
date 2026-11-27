@@ -19,6 +19,18 @@ var linkOffers = []core.Offer{
 	{Scope: "monitoring:read", Name: "See your servers", Description: "Read your servers' status and headline numbers (CPU, memory, disk, temperature), their uptime checks with certificate dates, and their alerts — what Pocket Hub shows as a status tile and Pocket Day notes when something went down."},
 }
 
+// capabilities is what Pocket Search, Pocket Day and Pocket Hub may ask
+// Monitoring (docs/capabilities.md in pocket-homelab-core); Register adds the
+// pocket:search/day/widget offers. All three only read what the app has
+// already measured and stored: none of them runs a check or reads a server.
+// There is no quick line to keep here: a check needs a kind and a target.
+var capabilities = core.Capabilities{
+	Search: &core.Searchable{What: "Your uptime checks and servers, by name",
+		Kinds: []string{"monitor", "server"}, Bangs: []string{"monitoring", "status"}},
+	Day:    &core.DayFeed{Label: "Monitoring", One: "incident", Many: "incidents", What: "What went down that day and for how long, and the alerts about your servers"},
+	Widget: &core.Widget{Title: "Box status", What: "What is down now, then warnings such as a disk nearly full, with CPU, memory and disk"},
+}
+
 type linkRoute struct {
 	methods string
 	path    *regexp.Regexp
@@ -36,6 +48,9 @@ var linkRoutes = []linkRoute{
 var errLinkScope = errors.New("outside the link's scope")
 
 func linkAllows(scopes []string, r *http.Request) bool {
+	if capabilities.LinkAllows(scopes, r) {
+		return true
+	}
 	for _, lr := range linkRoutes {
 		if !strings.Contains(" "+lr.methods+" ", " "+r.Method+" ") || !lr.path.MatchString(r.URL.Path) {
 			continue

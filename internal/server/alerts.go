@@ -326,9 +326,16 @@ func (s *Server) alertResolved(ctx context.Context, sv store.Server, a *store.Al
 
 // alertLink opens the server on the tab the alert is about.
 func (s *Server) alertLink(id int64, metric, target string) string {
-	l := s.serverLink(id)
+	if s.cfg.BaseURL == "" {
+		return ""
+	}
+	return s.cfg.BaseURL + alertPath(id, metric, target)
+}
+
+// alertPath is the page in the app an alert is about: the server, on its tab.
+func alertPath(id int64, metric, target string) string {
+	l := "/server/" + itoa64(id)
 	switch {
-	case l == "":
 	case isSpeedMetric(metric):
 		l += "?tab=internet"
 	case metric == "job":

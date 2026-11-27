@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -349,6 +350,39 @@ func (s *Store) CheckEvents(ctx context.Context, serverID, checkID int64, limit 
 	}
 	defer rows.Close()
 	out := []CheckEvent{}
+	for rows.Next() {
+		var e CheckEvent
+		if err := rows.Scan(&e.CheckID, &e.T, &e.Status, &e.Msg); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// CheckEventsBetween returns the ups and downs of the given servers' checks
+// from from to to (unix seconds), each check's oldest first, led by its last
+// change before from (a check that was already down then) and followed by
+// its first change from to on (when a check down at the end came back).
+func (s *Store) CheckEventsBetween(ctx context.Context, serverIDs []int64, from, to int64) ([]CheckEvent, error) {
+	out := []CheckEvent{}
+	if len(serverIDs) == 0 {
+		return out, nil
+	}
+	args := []any{}
+	for _, id := range serverIDs {
+		args = append(args, id)
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT e.check_id, e.ts, e.status, e.msg FROM check_events e JOIN checks c ON c.id = e.check_id
+		WHERE c.server_id IN (?`+strings.Repeat(",?", len(serverIDs)-1)+`)
+		AND ((e.ts >= ? AND e.ts < ?)
+			OR e.ts = (SELECT MAX(p.ts) FROM check_events p WHERE p.check_id = e.check_id AND p.ts < ?)
+			OR e.ts = (SELECT MIN(n.ts) FROM check_events n WHERE n.check_id = e.check_id AND n.ts >= ?))
+		ORDER BY e.check_id, e.ts`, append(args, from, to, from, to)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	for rows.Next() {
 		var e CheckEvent
 		if err := rows.Scan(&e.CheckID, &e.T, &e.Status, &e.Msg); err != nil {
