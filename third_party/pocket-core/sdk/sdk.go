@@ -40,18 +40,21 @@ var ErrNotFound = errors.New("not found")
 
 // Manifest describes the app to Core. See docs/manifest.md.
 type Manifest struct {
-	Slug        string         `json:"slug"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Icon        string         `json:"icon,omitempty"`
-	Version     string         `json:"version,omitempty"`
-	URL         string         `json:"url"`
-	PublicURL   string         `json:"public_url,omitempty"`
-	HealthPath  string         `json:"health_path,omitempty"`
-	EnvPrefix   string         `json:"env_prefix,omitempty"`
-	Publishes   []string       `json:"publishes,omitempty"`
-	Subscribes  []Subscription `json:"subscribes,omitempty"`
-	OIDC        *OIDCRequest   `json:"oidc,omitempty"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Icon        string `json:"icon,omitempty"`
+	// Category is the shelf the app sits on in a launcher ("Money", "Home",
+	// "Media"…), in the app's own word; empty = no shelf of its own.
+	Category   string         `json:"category,omitempty"`
+	Version    string         `json:"version,omitempty"`
+	URL        string         `json:"url"`
+	PublicURL  string         `json:"public_url,omitempty"`
+	HealthPath string         `json:"health_path,omitempty"`
+	EnvPrefix  string         `json:"env_prefix,omitempty"`
+	Publishes  []string       `json:"publishes,omitempty"`
+	Subscribes []Subscription `json:"subscribes,omitempty"`
+	OIDC       *OIDCRequest   `json:"oidc,omitempty"`
 	// Offers are scopes other apps may use here for a person (see docs/links.md).
 	Offers []Offer `json:"offers,omitempty"`
 	// Uses are what this app does in other apps for a person.
@@ -59,6 +62,13 @@ type Manifest struct {
 	// Services are third-party services (immich, maloja, dawarich…) the app
 	// reaches for a person through Core instead of a pasted URL and key.
 	Services []ServiceUse `json:"services,omitempty"`
+	// Portable is what Pocket Move may copy out and bring in for a person
+	// (docs/move.md); Register adds the move:export / move:import offers.
+	Portable *Portable `json:"portable,omitempty"`
+	// Capabilities are what Pocket Search, Day and Hub may ask the app
+	// (docs/capabilities.md): search, day, widget, capture. Register adds the
+	// pocket:* offers.
+	Capabilities
 }
 
 // ServiceUse asks Core for people's way into a third-party service, by its
@@ -351,6 +361,9 @@ func (c *Client) Register(ctx context.Context, registrationKey string, m Manifes
 			m.Offers = append(m.Offers, Offer{Scope: "events:read", Name: "Read activity events", Description: "Read this person's attributed events through approved app links"})
 		}
 	}
+
+	addPortableOffers(&m)
+	addCapabilityOffers(&m)
 
 	auth := c.Token()
 	if auth == "" {

@@ -1,6 +1,51 @@
 // Shared Ask panel. Shadow DOM keeps host application styles and layout intact.
 // Apps open it from their own header button (pocket-ask event); the old floating
 // launcher pill is never shown, so it cannot cover full-screen views.
+// Pocket Hub (the native app that shows Pocket apps) puts window.pocketHub in an
+// app's page. Every Pocket app gets the hub's two shortcuts from the shared
+// conventions here, and one call to say what needs the person:
+//   pocketApp.report({ count, status, items, open })  - Activity, the badge (no-op outside the hub)
+//   pocketApp.handle({ navigate, toggleSidebar })      - the app's own ways, when the defaults don't fit
+if (!window.pocketApp) {
+ const hub = window.pocketHub;
+ const sidebarButton = () => [...document.querySelectorAll('[aria-label="Hide the sidebar"],[aria-label="Show the sidebar"]')].find(b => b.getClientRects().length);
+ const defaults = {
+  // A link from another app: the router (React Router, like every Pocket app) follows a history entry
+  // written its way; false when the page didn't take it (the hub then loads the page).
+  navigate: async url => {
+   const u = new URL(url, location.href);
+   if (u.origin !== location.origin) return false;
+   const to = u.pathname + u.search + u.hash;
+   if (location.pathname + location.search + location.hash === to) return true;
+   const st = history.state || {};
+   const next = { usr: null, key: Math.random().toString(36).slice(2, 10), idx: (typeof st.idx === 'number' ? st.idx : 0) + 1 };
+   history.pushState(next, '', to);
+   dispatchEvent(new PopStateEvent('popstate', { state: next }));
+   await new Promise(r => setTimeout(r, 120));
+   const main = document.getElementById('root') || document.body;
+   return location.pathname + location.search === u.pathname + u.search && main.childElementCount > 0 && document.body.innerText.trim().length > 0;
+  },
+  // The "Hide the sidebar" / "Show the sidebar" button every Pocket app has.
+  toggleSidebar: () => { const b = sidebarButton(); if (!b) return false; b.click(); return true },
+ };
+ let own = {};
+ const register = () => hub?.handle?.({ navigate: u => (own.navigate || defaults.navigate)(u), toggleSidebar: () => (own.toggleSidebar || defaults.toggleSidebar)() });
+ register();
+ window.pocketApp = Object.freeze({
+  inHub: !!hub,
+  handle(h) { own = h && typeof h === 'object' ? h : {}; register() },
+  // count: the badge (also an installed web app's); status: what's busy ("2 working");
+  // items: [{ id, title, detail, state: 'needs-you'|'working'|'failed'|'unread'|'done'|'info', url, at }];
+  // open(id): show that item without a reload.
+  report({ count, status, items, open } = {}) {
+   if (count !== undefined) { const n = Number(count) || 0; try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.() } catch {} }
+   if (!hub) return;
+   if (status !== undefined) hub.setStatus?.(status || null);
+   if (items !== undefined) hub.setItems?.(Array.isArray(items) ? items : [], typeof open === 'function' ? open : undefined);
+  },
+ });
+ window.dispatchEvent(new Event('pocket-app-ready'));
+}
 if (document.querySelector('pocket-ask-launcher')) return;
 const host = document.createElement('pocket-ask-launcher');
 const root = host.attachShadow({mode:'open'});
@@ -28,7 +73,7 @@ function pageContext(node) {
  for(const key of [...itemURL.searchParams.keys()])if(/token|secret|password|code|key/i.test(key))itemURL.searchParams.delete(key);
  return {app:config.app,url:itemURL.href,title:title.slice(0,300),selection:(selected||(item?.innerText||'')).slice(0,12000)};
 }
-function sendContext(){if(frame?.contentWindow)frame.contentWindow.postMessage({type:'pocket-ask-context',source,prompt,dark:document.documentElement.dataset.theme==='dark'||document.documentElement.classList.contains('dark')},coreOrigin)}
+function sendContext(){if(frame?.contentWindow)frame.contentWindow.postMessage({type:'pocket-ask-context',source,prompt,navigate:true,dark:document.documentElement.dataset.theme==='dark'||document.documentElement.classList.contains('dark')},coreOrigin)}
 function open(node,detail){
  source=pageContext(node);prompt='';
  if(detail?.source){
@@ -73,7 +118,9 @@ function pick(on){picking=on;hint.hidden=!on;launch.hidden=on;document.documentE
 launch.querySelector('.open').onclick=()=>open();launch.querySelector('.pick').onclick=()=>pick(true);close.onclick=hide;hint.onclick=()=>pick(false);
 document.addEventListener('click',e=>{if(!picking||e.composedPath().includes(host))return;e.preventDefault();e.stopImmediatePropagation();pick(false);open(e.target)},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(picking){e.stopPropagation();pick(false)}else if(!panel.hidden){e.stopPropagation();hide()}}});
-window.addEventListener('message',e=>{if(e.origin!==coreOrigin||e.source!==frame?.contentWindow)return;if(e.data?.type==='pocket-ask-ready')sendContext();if(e.data?.type==='pocket-ask-close')hide()});
+window.addEventListener('message',e=>{if(e.origin!==coreOrigin||e.source!==frame?.contentWindow)return;if(e.data?.type==='pocket-ask-ready')sendContext();if(e.data?.type==='pocket-ask-close')hide();if(e.data?.type==='pocket-ask-navigate')navigate(e.data.url)});
+// The app routes the link itself if it can (cancels the event); otherwise it loads in this window.
+function navigate(url){let u;try{u=new URL(url,location.href)}catch{return}if(u.origin!==location.origin)return;if(dispatchEvent(new CustomEvent('pocket-ask-navigate',{detail:{url:u.href},cancelable:true})))location.assign(u.href)}
 window.addEventListener('pocket-ask',e=>open(e.detail?.element,e.detail));
 window.addEventListener('pocket-ask-pick',()=>pick(true));
 // App integrations may dispatch pocket-ask with an item element; the picker also
